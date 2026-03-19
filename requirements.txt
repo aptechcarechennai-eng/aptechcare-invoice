@@ -1,6 +1,0 @@
-streamlit
-fpdf
-pandas
-pillow
-pdf2image
-poppler-utils
