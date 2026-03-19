@@ -1,5 +1,4 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import datetime
 from fpdf import FPDF
@@ -12,43 +11,17 @@ from email import encoders
 import base64
 from PIL import Image
 import json
+from supabase import create_client, Client
 
-# ---------------- DATABASE ----------------
+# ---------------- SUPABASE CONNECTION ----------------
 
 @st.cache_resource
-def get_connection():
-    conn = sqlite3.connect("app.db", check_same_thread=False)
-    conn.execute('''CREATE TABLE IF NOT EXISTS customers
-        (id INTEGER PRIMARY KEY, name TEXT UNIQUE,
-         phone TEXT, email TEXT, address TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS invoices
-        (id INTEGER PRIMARY KEY, invoice_no TEXT, customer TEXT,
-         total REAL, paid REAL, amount_due REAL, date TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS transactions
-        (id INTEGER PRIMARY KEY, type TEXT, amount REAL, note TEXT, date TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS services
-        (id INTEGER PRIMARY KEY, name TEXT UNIQUE, price REAL)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS materials
-        (id INTEGER PRIMARY KEY, serial_no TEXT, product_name TEXT,
-         notes TEXT, photos TEXT, date TEXT)''')
-    conn.commit()
+def get_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
-    for col in ["phone", "email", "address"]:
-        try:
-            conn.execute(f"ALTER TABLE customers ADD COLUMN {col} TEXT")
-            conn.commit()
-        except: pass
-
-    # Default services if empty
-    if conn.execute("SELECT COUNT(*) FROM services").fetchone()[0] == 0:
-        for name, price in [("General Service", 500), ("Desktop Service", 800), ("Printer Service", 500)]:
-            try:
-                conn.execute("INSERT INTO services (name, price) VALUES (?, ?)", (name, price))
-            except: pass
-        conn.commit()
-    return conn
-
-conn = get_connection()
+sb = get_supabase()
 
 # ---------------- COMPANY INFO ----------------
 
@@ -70,8 +43,15 @@ os.makedirs(MATERIALS_DIR, exist_ok=True)
 # ---------------- HELPERS ----------------
 
 def get_next_invoice_no():
-    result = conn.execute("SELECT MAX(CAST(SUBSTR(invoice_no, 4) AS INTEGER)) FROM invoices").fetchone()[0]
-    return f"AP-{(result or 999) + 1}"
+    res = sb.table("invoices").select("invoice_no").execute()
+    if res.data:
+        nums = []
+        for r in res.data:
+            try:
+                nums.append(int(r["invoice_no"].replace("AP-", "")))
+            except: pass
+        return f"AP-{max(nums) + 1}" if nums else "AP-1000"
+    return "AP-1000"
 
 def save_logo(uploaded_file):
     img = Image.open(uploaded_file).convert("RGB")
@@ -80,17 +60,9 @@ def save_logo(uploaded_file):
 def logo_exists():
     return os.path.exists(LOGO_PATH)
 
-def save_customer(name, phone, email, address):
-    try:
-        conn.execute("INSERT INTO customers (name, phone, email, address) VALUES (?, ?, ?, ?)",
-                     (name, phone, email, address))
-    except:
-        conn.execute("UPDATE customers SET phone=?, email=?, address=? WHERE name=?",
-                     (phone, email, address, name))
-    conn.commit()
-
 def get_services():
-    return pd.read_sql("SELECT * FROM services ORDER BY name", conn)
+    res = sb.table("services").select("*").order("name").execute()
+    return res.data or []
 
 def pdf_to_images(pdf_path):
     try:
@@ -251,7 +223,6 @@ st.markdown("""
     .cust-info { background:#f0f7ff;border-radius:10px;padding:10px 14px;font-size:13px;color:#333;margin-bottom:8px; }
     .share-box { background:#f0f7ff;border-radius:12px;padding:14px;margin-top:10px; }
     .wa-btn { display:block;background:#25D366;color:white;padding:12px;border-radius:12px;text-align:center;font-size:15px;font-weight:600;text-decoration:none;margin:8px 0; }
-    .svc-card { background:white;border-radius:10px;padding:10px 14px;margin:6px 0;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;justify-content:space-between; }
     #MainMenu, footer, header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -279,9 +250,11 @@ if menu == "🧾 Invoice":
     invoice_no = get_next_invoice_no()
 
     st.markdown("**👤 Customer**")
-    cust_df      = pd.read_sql("SELECT name, phone, email, address FROM customers", conn)
-    customer_list = cust_df["name"].tolist()
-    customer     = st.selectbox("", ["+ New Customer"] + customer_list, label_visibility="collapsed")
+    cust_res  = sb.table("customers").select("*").execute()
+    cust_data = cust_res.data or []
+    cust_names = [c["name"] for c in cust_data]
+    customer  = st.selectbox("", ["+ New Customer"] + cust_names, label_visibility="collapsed")
+
     cust_phone = cust_email = cust_address = ""
 
     if customer == "+ New Customer":
@@ -290,11 +263,11 @@ if menu == "🧾 Invoice":
         cust_address = st.text_input("Address",          placeholder="e.g. Anna Nagar, Chennai")
         cust_email   = st.text_input("Email (optional)", placeholder="customer@email.com")
     else:
-        row = cust_df[cust_df["name"] == customer]
-        if not row.empty:
-            cust_phone   = row.iloc[0]["phone"]   or ""
-            cust_email   = row.iloc[0]["email"]   or ""
-            cust_address = row.iloc[0]["address"] or ""
+        row = next((c for c in cust_data if c["name"] == customer), None)
+        if row:
+            cust_phone   = row.get("phone", "") or ""
+            cust_email   = row.get("email", "") or ""
+            cust_address = row.get("address", "") or ""
         st.markdown(f"""<div class='cust-info'>
             📱 <b>{cust_phone or 'No phone'}</b><br>
             🏠 {cust_address or 'No address'}<br>
@@ -304,9 +277,8 @@ if menu == "🧾 Invoice":
             cust_address = st.text_input("Address", value=cust_address, key="ea")
             cust_email   = st.text_input("Email",   value=cust_email,   key="ee")
             if st.button("Update"):
-                conn.execute("UPDATE customers SET phone=?, email=?, address=? WHERE name=?",
-                             (cust_phone, cust_email, cust_address, customer))
-                conn.commit(); st.success("Updated!")
+                sb.table("customers").update({"phone": cust_phone, "email": cust_email, "address": cust_address}).eq("name", customer).execute()
+                st.success("Updated!"); st.rerun()
 
     c1, c2 = st.columns(2)
     with c1: st.markdown(f"<div class='inv-badge'>📄 {invoice_no}</div>", unsafe_allow_html=True)
@@ -316,10 +288,9 @@ if menu == "🧾 Invoice":
     st.markdown("**🛒 Items**")
     num_items = st.number_input("No. of Items", min_value=1, max_value=15, step=1, value=1)
 
-    # Load services from DB
-    svc_df   = get_services()
-    svc_dict = dict(zip(svc_df["name"], svc_df["price"]))
-    svc_names = list(svc_dict.keys())
+    svcs     = get_services()
+    svc_dict = {s["name"]: s["price"] for s in svcs}
+    svc_names = list(svc_dict.keys()) or ["General Service"]
 
     item_list = []; subtotal = 0
     for i in range(int(num_items)):
@@ -331,8 +302,7 @@ if menu == "🧾 Invoice":
                                           value=int(svc_dict.get(item_name, 0)), key=f"price_{i}")
         notes  = st.text_area("Notes (optional)", key=f"notes_{i}", height=60, placeholder="Work done details...")
         amount  = qty * price; subtotal += amount
-        st.markdown(f"💰 **Rs.{amount:,.2f}**")
-        st.markdown("---")
+        st.markdown(f"💰 **Rs.{amount:,.2f}**"); st.markdown("---")
         item_list.append({"Item": item_name, "Qty": qty, "Price": price, "Amount": amount, "Notes": notes})
 
     gst_enabled = st.toggle("Enable GST", value=False)
@@ -358,14 +328,24 @@ if menu == "🧾 Invoice":
         if not customer or customer == "+ New Customer":
             st.error("Customer name enter pannanu!")
         else:
-            save_customer(customer, cust_phone, cust_email, cust_address)
+            # Save customer
+            try:
+                sb.table("customers").insert({"name": customer, "phone": cust_phone,
+                                               "email": cust_email, "address": cust_address}).execute()
+            except:
+                sb.table("customers").update({"phone": cust_phone, "email": cust_email,
+                                               "address": cust_address}).eq("name", customer).execute()
+
             date_str = date.strftime("%d/%m/%Y")
             pdf_file, total_c, due_c = generate_pdf(
                 invoice_no, customer, cust_address, cust_phone, date_str, item_list, paid_amount)
-            conn.execute(
-                "INSERT INTO invoices (invoice_no, customer, total, paid, amount_due, date) VALUES (?, ?, ?, ?, ?, ?)",
-                (invoice_no, customer, total_c, paid_amount, due_c, date_str))
-            conn.commit()
+
+            sb.table("invoices").insert({
+                "invoice_no": invoice_no, "customer": customer,
+                "total": total_c, "paid": paid_amount,
+                "amount_due": due_c, "date": date_str
+            }).execute()
+
             img_paths = pdf_to_images(pdf_file)
             st.success(f"✅ Invoice {invoice_no} saved!")
             st.session_state.update({
@@ -398,7 +378,7 @@ if menu == "🧾 Invoice":
                 if os.path.exists(img_path):
                     st.image(img_path, use_column_width=True)
                     with open(img_path, "rb") as f:
-                        st.download_button(f"📥 Download Image (Page {i+1})", f.read(),
+                        st.download_button(f"📥 Download Image", f.read(),
                                            file_name=f"invoice_{inv_no}_p{i+1}.jpg",
                                            mime="image/jpeg", key=f"dl_img_{i}")
         wa_num  = phone.replace("+","").replace(" ","")
@@ -406,7 +386,6 @@ if menu == "🧾 Invoice":
         wa_link = f"https://wa.me/{wa_num}?text={msg}" if wa_num else f"https://wa.me/?text={msg}"
         st.markdown(f"<a href='{wa_link}' target='_blank' class='wa-btn'>📱 Open WhatsApp</a>",
                     unsafe_allow_html=True)
-        st.caption("Image download → WhatsApp → Attach → Send!")
 
         st.divider()
         st.markdown("**🖨️ Print**")
@@ -433,29 +412,40 @@ if menu == "🧾 Invoice":
 
     st.divider()
     st.markdown("**📋 Recent Invoices**")
-    df = pd.read_sql("SELECT invoice_no,customer,total,paid,amount_due,date FROM invoices ORDER BY id DESC LIMIT 10", conn)
-    st.dataframe(df, use_container_width=True, hide_index=True) if not df.empty else st.info("No invoices yet.")
+    inv_res = sb.table("invoices").select("*").order("id", desc=True).limit(10).execute()
+    if inv_res.data:
+        st.dataframe(pd.DataFrame(inv_res.data)[["invoice_no","customer","total","paid","amount_due","date"]],
+                     use_container_width=True, hide_index=True)
+    else:
+        st.info("No invoices yet.")
 
 # ================================================================
 # CASHFLOW
 # ================================================================
 elif menu == "💰 Cashflow":
     st.markdown("**💰 Cashflow**")
-    df = pd.read_sql("SELECT * FROM transactions ORDER BY id DESC", conn)
+    cf_res = sb.table("transactions").select("*").order("id", desc=True).execute()
+    df     = pd.DataFrame(cf_res.data) if cf_res.data else pd.DataFrame()
+
     if not df.empty:
         inc = df[df["type"]=="Income"]["amount"].sum()
         exp = df[df["type"]=="Expense"]["amount"].sum()
         c1, c2, c3 = st.columns(3)
-        c1.metric("Income", f"Rs.{inc:,.0f}"); c2.metric("Expense", f"Rs.{exp:,.0f}")
+        c1.metric("Income",  f"Rs.{inc:,.0f}")
+        c2.metric("Expense", f"Rs.{exp:,.0f}")
         c3.metric("Balance", f"Rs.{inc-exp:,.0f}")
+
     st.divider()
     t_type = st.selectbox("Type", ["Income","Expense"])
     amount = st.number_input("Amount Rs.", min_value=0)
     note   = st.text_input("Note")
     if st.button("Save"):
-        conn.execute("INSERT INTO transactions (type,amount,note,date) VALUES (?,?,?,?)",
-                     (t_type,amount,note,datetime.now().strftime("%d/%m/%Y")))
-        conn.commit(); st.success("Saved!"); st.rerun()
+        sb.table("transactions").insert({
+            "type": t_type, "amount": amount,
+            "note": note, "date": datetime.now().strftime("%d/%m/%Y")
+        }).execute()
+        st.success("Saved!"); st.rerun()
+
     if not df.empty:
         st.dataframe(df[["type","amount","note","date"]], use_container_width=True, hide_index=True)
 
@@ -465,79 +455,69 @@ elif menu == "💰 Cashflow":
 elif menu == "📦 Materials":
     st.markdown("**📦 Material / Product Entry**")
 
-    with st.form("material_form"):
-        serial_no    = st.text_input("Serial No",     placeholder="e.g. SN123456")
-        product_name = st.text_input("Product Name",  placeholder="e.g. HP LaserJet Toner")
-        notes        = st.text_area("Notes",          placeholder="Condition, purchase details...", height=80)
+    with st.form("mat_form"):
+        serial_no    = st.text_input("Serial No",    placeholder="e.g. SN123456")
+        product_name = st.text_input("Product Name", placeholder="e.g. HP LaserJet Toner")
+        notes        = st.text_area("Notes",         height=80)
         photos       = st.file_uploader("Upload Photos (max 10)", type=["jpg","jpeg","png"],
                                          accept_multiple_files=True)
-        submitted    = st.form_submit_button("💾 Save Material")
+        submitted    = st.form_submit_button("💾 Save")
 
         if submitted:
             if not product_name:
                 st.error("Product name enter pannanu!")
             else:
-                # Save photos
                 saved_paths = []
                 if photos:
-                    photos = photos[:10]  # max 10
-                    for i, photo in enumerate(photos):
+                    for i, photo in enumerate(photos[:10]):
                         fname = f"{MATERIALS_DIR}/{serial_no or 'item'}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{i}.jpg"
-                        img   = Image.open(photo).convert("RGB")
-                        img.save(fname, "JPEG", quality=90)
+                        Image.open(photo).convert("RGB").save(fname, "JPEG", quality=90)
                         saved_paths.append(fname)
-
-                conn.execute(
-                    "INSERT INTO materials (serial_no, product_name, notes, photos, date) VALUES (?, ?, ?, ?, ?)",
-                    (serial_no, product_name, notes, json.dumps(saved_paths), datetime.now().strftime("%d/%m/%Y"))
-                )
-                conn.commit()
-                st.success(f"✅ '{product_name}' saved with {len(saved_paths)} photo(s)!")
+                sb.table("materials").insert({
+                    "serial_no": serial_no, "product_name": product_name,
+                    "notes": notes, "photos": json.dumps(saved_paths),
+                    "date": datetime.now().strftime("%d/%m/%Y")
+                }).execute()
+                st.success(f"✅ '{product_name}' saved!")
 
     st.divider()
     st.markdown("**📋 Material Records**")
+    mat_res = sb.table("materials").select("*").order("id", desc=True).execute()
+    mat_data = mat_res.data or []
 
-    mat_df = pd.read_sql("SELECT * FROM materials ORDER BY id DESC", conn)
-    if mat_df.empty:
+    if not mat_data:
         st.info("No materials yet.")
     else:
-        # Search
-        search = st.text_input("🔍 Search", placeholder="Product name or serial no...")
+        search = st.text_input("🔍 Search")
         if search:
-            mat_df = mat_df[
-                mat_df["product_name"].str.contains(search, case=False, na=False) |
-                mat_df["serial_no"].str.contains(search, case=False, na=False)
-            ]
+            mat_data = [m for m in mat_data if
+                        search.lower() in (m.get("product_name","") or "").lower() or
+                        search.lower() in (m.get("serial_no","") or "").lower()]
 
-        for _, row in mat_df.iterrows():
-            with st.expander(f"📦 {row['product_name']} | {row['serial_no'] or 'No Serial'} | {row['date']}"):
-                st.markdown(f"**Serial No:** {row['serial_no'] or '-'}")
-                st.markdown(f"**Product:** {row['product_name']}")
-                st.markdown(f"**Notes:** {row['notes'] or '-'}")
-                st.markdown(f"**Date:** {row['date']}")
-
-                # Show photos
-                photos_list = json.loads(row["photos"]) if row["photos"] else []
+        for row in mat_data:
+            with st.expander(f"📦 {row['product_name']} | {row.get('serial_no') or 'No Serial'} | {row['date']}"):
+                st.markdown(f"**Serial No:** {row.get('serial_no') or '-'}")
+                st.markdown(f"**Notes:** {row.get('notes') or '-'}")
+                photos_list = json.loads(row["photos"]) if row.get("photos") else []
                 if photos_list:
-                    st.markdown("**Photos:**")
                     cols = st.columns(min(len(photos_list), 3))
                     for i, p in enumerate(photos_list):
                         if os.path.exists(p):
                             cols[i % 3].image(p, use_column_width=True)
-
-                if st.button(f"🗑️ Delete", key=f"del_mat_{row['id']}"):
-                    conn.execute("DELETE FROM materials WHERE id=?", (row["id"],))
-                    conn.commit(); st.rerun()
+                if st.button("🗑️ Delete", key=f"del_{row['id']}"):
+                    sb.table("materials").delete().eq("id", row["id"]).execute()
+                    st.rerun()
 
 # ================================================================
 # MONTHLY REPORT
 # ================================================================
 elif menu == "📊 Monthly Report":
     st.markdown("**📊 Monthly Report**")
-    df = pd.read_sql("SELECT * FROM invoices", conn)
-    if df.empty:
+    inv_res = sb.table("invoices").select("*").execute()
+    if not inv_res.data:
         st.info("No invoices yet.")
     else:
+        df = pd.DataFrame(inv_res.data)
         df["date_parsed"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
         df["month_str"]   = df["date_parsed"].dt.strftime("%b %Y")
         months    = df["month_str"].dropna().unique().tolist()
@@ -554,7 +534,8 @@ elif menu == "📊 Monthly Report":
         st.dataframe(mdf[["invoice_no","customer","total","paid","amount_due","date"]].reset_index(drop=True),
                      use_container_width=True, hide_index=True)
         top = df.groupby("customer")["total"].sum().reset_index().sort_values("total",ascending=False).head(5)
-        st.bar_chart(top.set_index("customer"))
+        if not top.empty:
+            st.bar_chart(top.set_index("customer"))
         csv = mdf.to_csv(index=False).encode("utf-8")
         st.download_button("📥 Download CSV", csv, file_name=f"report_{sel_month}.csv", mime="text/csv")
 
@@ -564,7 +545,6 @@ elif menu == "📊 Monthly Report":
 elif menu == "⚙️ Settings":
     st.markdown("**⚙️ Settings**")
 
-    # Logo
     st.markdown("**🖼️ Logo**")
     if logo_exists():
         st.image(LOGO_PATH, width=120); st.success("✅ Logo saved")
@@ -576,53 +556,47 @@ elif menu == "⚙️ Settings":
         if nl: save_logo(nl); st.success("✅ Saved!"); st.rerun()
 
     st.divider()
-
-    # ── SERVICE LIST ──
     st.markdown("**🛠️ Service List**")
+    svcs = get_services()
 
-    svc_df = get_services()
-
-    # Add new service
     with st.expander("➕ Add New Service"):
-        new_svc_name  = st.text_input("Service Name",  placeholder="e.g. RAM Upgrade")
-        new_svc_price = st.number_input("Price Rs.",   min_value=0, key="nsv_price")
+        ni   = st.text_input("Service Name")
+        np_  = st.number_input("Price Rs.", min_value=0, key="np")
         if st.button("Add Service"):
-            if new_svc_name:
+            if ni:
                 try:
-                    conn.execute("INSERT INTO services (name, price) VALUES (?, ?)", (new_svc_name, new_svc_price))
-                    conn.commit(); st.success(f"'{new_svc_name}' Added!"); st.rerun()
-                except: st.error("Service already exists!")
+                    sb.table("services").insert({"name": ni, "price": np_}).execute()
+                    st.success(f"'{ni}' Added!"); st.rerun()
+                except: st.error("Already exists!")
 
-    # List & Edit & Delete
-    st.markdown("**Current Services:**")
-    for _, row in svc_df.iterrows():
+    for svc in svcs:
         c1, c2, c3 = st.columns([4, 2, 1])
-        with c1: st.markdown(f"**{row['name']}**")
+        with c1: st.markdown(f"**{svc['name']}**")
         with c2:
-            new_price = st.number_input("Rs.", value=int(row["price"]),
-                                         key=f"svc_price_{row['id']}", label_visibility="collapsed")
-            if new_price != row["price"]:
-                conn.execute("UPDATE services SET price=? WHERE id=?", (new_price, row["id"]))
-                conn.commit()
+            new_p = st.number_input("Rs.", value=int(svc["price"]),
+                                     key=f"sp_{svc['id']}", label_visibility="collapsed")
+            if new_p != svc["price"]:
+                sb.table("services").update({"price": new_p}).eq("id", svc["id"]).execute()
         with c3:
-            if st.button("🗑️", key=f"del_svc_{row['id']}"):
-                conn.execute("DELETE FROM services WHERE id=?", (row["id"],))
-                conn.commit(); st.rerun()
+            if st.button("🗑️", key=f"ds_{svc['id']}"):
+                sb.table("services").delete().eq("id", svc["id"]).execute(); st.rerun()
 
     st.divider()
-
-    # Customers
     st.markdown("**👥 Customers**")
-    cdf = pd.read_sql("SELECT name,phone,address,email FROM customers", conn)
-    st.dataframe(cdf, use_container_width=True, hide_index=True) if not cdf.empty else st.info("No customers.")
+    cust_res = sb.table("customers").select("*").execute()
+    if cust_res.data:
+        st.dataframe(pd.DataFrame(cust_res.data)[["name","phone","address","email"]],
+                     use_container_width=True, hide_index=True)
+    else:
+        st.info("No customers.")
 
     st.divider()
+    inv_count  = sb.table("invoices").select("id", count="exact").execute().count or 0
+    cust_count = sb.table("customers").select("id", count="exact").execute().count or 0
+    inv_all    = sb.table("invoices").select("total,amount_due").execute().data or []
+    total_rev  = sum(r["total"] for r in inv_all)
+    total_due  = sum(r["amount_due"] for r in inv_all)
 
-    # Stats
-    st.markdown("**📊 Stats**")
     c1, c2 = st.columns(2)
-    c1.metric("Invoices",  conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0])
-    c2.metric("Customers", conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0])
-    c1.metric("Revenue",   f"Rs.{conn.execute('SELECT SUM(total) FROM invoices').fetchone()[0] or 0:,.0f}")
-    c2.metric("Pending",   f"Rs.{conn.execute('SELECT SUM(amount_due) FROM invoices').fetchone()[0] or 0:,.0f}")
-    c1.metric("Materials", conn.execute("SELECT COUNT(*) FROM materials").fetchone()[0])
+    c1.metric("Invoices",  inv_count);  c2.metric("Customers", cust_count)
+    c1.metric("Revenue",   f"Rs.{total_rev:,.0f}"); c2.metric("Pending", f"Rs.{total_due:,.0f}")
