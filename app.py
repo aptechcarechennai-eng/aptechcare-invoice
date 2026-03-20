@@ -343,26 +343,55 @@ with st.sidebar:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── PAGE IMPORTS ─────────────────────────────────────────────────
+import sys, os
+# Support both flat structure (all in root) and pages/ folder structure
+sys.path.insert(0, os.path.dirname(__file__))
+
 page = st.session_state.page
 
-if page == "home":
-    from pages.home import render
-    render()
-elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
-    from pages.documents import render
-    render(page)
-elif page == "cashflow":
-    from pages.cashflow import render
-    render()
-elif page == "reports":
-    from pages.reports import render
-    render()
-elif page == "items":
-    from pages.items import render
-    render()
-elif page == "customers":
-    from pages.customers import render
-    render()
-elif page == "settings":
-    from pages.settings import render
-    render()
+try:
+    if page == "home":
+        try:
+            from pages.home import render
+        except ImportError:
+            from home import render
+        render()
+    elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
+        try:
+            from pages.documents import render
+        except ImportError:
+            from documents import render
+        render(page)
+    elif page == "cashflow":
+        try:
+            from pages.cashflow import render
+        except ImportError:
+            from cashflow import render
+        render()
+    elif page == "reports":
+        try:
+            from pages.reports import render
+        except ImportError:
+            from reports import render
+        render()
+    elif page == "items":
+        try:
+            from pages.items import render
+        except ImportError:
+            from items import render
+        render()
+    elif page == "customers":
+        try:
+            from pages.customers import render
+        except ImportError:
+            from customers import render
+        render()
+    elif page == "settings":
+        try:
+            from pages.settings import render
+        except ImportError:
+            from settings import render
+        render()
+except Exception as e:
+    st.error(f"Page load error: {e}")
+    st.info("Please check that all page files are uploaded correctly.")
