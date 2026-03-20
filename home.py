@@ -1,28 +1,26 @@
-import streamlit as st
+row1 = st.columns(3)
+row2 = st.columns(3)
 
+if row1[0].button("Create Invoice", use_container_width=True):
+    st.session_state.page = "invoice"
+    st.rerun()
 
-def render():
-    if "invoices" not in st.session_state:
-        st.session_state.invoices = []
+if row1[1].button("Create Estimate", use_container_width=True):
+    st.session_state.page = "estimate"
+    st.rerun()
 
-    if "customers" not in st.session_state:
-        st.session_state.customers = []
+if row1[2].button("Credit Note", use_container_width=True):
+    st.session_state.page = "credit"
+    st.rerun()
 
-    if "items_db" not in st.session_state:
-        st.session_state.items_db = []
+if row2[0].button("Delivery", use_container_width=True):
+    st.session_state.page = "delivery"
+    st.rerun()
 
-    invoices = st.session_state.invoices
+if row2[1].button("Purchase", use_container_width=True):
+    st.session_state.page = "purchase"
+    st.rerun()
 
-    st.title("Welcome back!")
-    st.caption("AP Tech Care - Smart Tech Solutions")
-
-    total = len(invoices)
-    paid_amt = sum(i.get("amount", 0) for i in invoices if i.get("status") == "paid")
-    pending_amt = sum(i.get("amount", 0) for i in invoices if i.get("status") != "paid")
-    overdue_n = len([i for i in invoices if i.get("status") == "overdue"])
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Invoices", total)
-    c2.metric("Paid", "₹ " + str(int(paid_amt)))
-    c3.metric("Pending", "₹ " + str(int(pending_amt)))
-    c4.metric("Overdue", overdue_n)
+if row2[2].button("Cash Flow", use_container_width=True):
+    st.session_state.page = "cashflow"
+    st.rerun()
