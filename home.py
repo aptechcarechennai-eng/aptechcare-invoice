@@ -11,7 +11,109 @@ def render():
 
     # ── Stats ──────────────────────────────────────────────────────
     total       = len(invoices)
-    paid_amt    = sum(i["amount"] for i in invoices if i["status"] == "paid")
+    paid_amt    = sum(i["amouimport streamlit as st
+
+
+def render():
+    invoices = st.session_state.invoices
+
+    st.title("Welcome back!")
+    st.caption("AP Tech Care - Smart Tech Solutions")
+
+    total = len(invoices)
+    paid_amt = sum(i["amount"] for i in invoices if i["status"] == "paid")
+    pending_amt = sum(i["amount"] for i in invoices if i["status"] != "paid")
+    overdue_n = len([i for i in invoices if i["status"] == "overdue"])
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Invoices", total)
+    c2.metric("Paid", "Rs." + str(int(paid_amt)))
+    c3.metric("Pending", "Rs." + str(int(pending_amt)))
+    c4.metric("Overdue", overdue_n)
+
+    st.divider()
+
+    st.subheader("Quick Actions")
+    q1, q2, q3, q4, q5, q6 = st.columns(6)
+
+    with q1:
+        if st.button("Invoice", key="qa_invoice", use_container_width=True):
+            st.session_state.page = "invoice"
+            st.rerun()
+    with q2:
+        if st.button("Estimate", key="qa_estimate", use_container_width=True):
+            st.session_state.page = "estimate"
+            st.rerun()
+    with q3:
+        if st.button("Credit", key="qa_credit", use_container_width=True):
+            st.session_state.page = "credit"
+            st.rerun()
+    with q4:
+        if st.button("Delivery", key="qa_delivery", use_container_width=True):
+            st.session_state.page = "delivery"
+            st.rerun()
+    with q5:
+        if st.button("Purchase", key="qa_purchase", use_container_width=True):
+            st.session_state.page = "purchase"
+            st.rerun()
+    with q6:
+        if st.button("Cash Flow", key="qa_cashflow", use_container_width=True):
+            st.session_state.page = "cashflow"
+            st.rerun()
+
+    st.divider()
+
+    left, right = st.columns([3, 1])
+
+    with left:
+        st.subheader("Pending List")
+        pending = [i for i in invoices if i["status"] != "paid"]
+
+        if not pending:
+            st.success("All invoices are paid!")
+        else:
+            for inv in pending[:5]:
+                s = inv["status"]
+                with st.container(border=True):
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown("**" + inv["customer"] + "**")
+                        st.caption(inv["id"] + " | Due: " + inv["due"])
+                        if s == "overdue":
+                            st.error("Overdue - Payment Pending")
+                    with col_b:
+                        st.markdown("**Rs." + str(int(inv["amount"])) + "**")
+                        st.caption(s.title())
+
+        if st.button("View All Invoices", key="home_view_all", use_container_width=True):
+            st.session_state.page = "invoice"
+            st.rerun()
+
+    with right:
+        st.subheader("Summary")
+
+        statuses = {}
+        for inv in invoices:
+            statuses[inv["status"]] = statuses.get(inv["status"], 0) + 1
+
+        for s, count in statuses.items():
+            st.write(s.title() + ": " + str(count))
+
+        st.divider()
+
+        cust_count = len(st.session_state.customers)
+        items_count = len(st.session_state.items_db)
+
+        st.info("Customers: " + str(cust_count))
+        st.success("Items: " + str(items_count))
+
+        if st.button("Add Customer", use_container_width=True, key="home_add_cust"):
+            st.session_state.page = "customers"
+            st.rerun()
+
+        if st.button("Add Item", use_container_width=True, key="home_add_item"):
+            st.session_state.page = "items"
+            st.rerun()nt"] for i in invoices if i["status"] == "paid")
     pending_amt = sum(i["amount"] for i in invoices if i["status"] != "paid")
     overdue_n   = len([i for i in invoices if i["status"] == "overdue"])
 
