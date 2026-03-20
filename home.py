@@ -1,7 +1,106 @@
 import streamlit as st
 
 def render():
+    invoices = st.session_staimport streamlit as st
+
+def render():
     invoices = st.session_state.invoices
+
+    st.title("👋 Welcome back!")
+    st.caption("AP Tech Care — Smart Tech Solutions")
+
+    # ── Stats ──────────────────────────────────────────────────────
+    total       = len(invoices)
+    paid_amt    = sum(i["amount"] for i in invoices if i["status"] == "paid")
+    pending_amt = sum(i["amount"] for i in invoices if i["status"] != "paid")
+    overdue_n   = len([i for i in invoices if i["status"] == "overdue"])
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📄 Total", total)
+    c2.metric("✅ Paid", f"₹{paid_amt/1000:.1f}K")
+    c3.metric("⏳ Pending", f"₹{pending_amt/1000:.1f}K")
+    c4.metric("⚠️ Overdue", overdue_n)
+
+    st.divider()
+
+    # ── Quick Actions ──────────────────────────────────────────────
+    st.subheader("⚡ Quick Actions")
+    q1, q2, q3, q4, q5, q6 = st.columns(6)
+    for col, pid, label in [
+        (q1,"invoice","📄 Invoice"),
+        (q2,"estimate","📋 Estimate"),
+        (q3,"credit","💳 Credit"),
+        (q4,"delivery","🚚 Delivery"),
+        (q5,"purchase","🛒 Purchase"),
+        (q6,"cashflow","📊 Cash Flow"),
+    ]:
+        with col:
+            if st.button(label, key=f"qa_{pid}", use_container_width=True):
+                st.session_state.page = pid
+                st.rerun()
+
+    st.divider()
+
+    # ── Pending List + Summary ─────────────────────────────────────
+    left, right = st.columns([3, 1])
+
+    with left:
+        st.subheader("📋 Pending List")
+        pending = [i for i in invoices if i["status"] != "paid"]
+
+        if not pending:
+            st.success("🎉 All invoices are paid!")
+        else:
+            for inv in pending[:5]:
+                s = inv["status"]
+                emoji = {"overdue":"⚠️","sent":"📤","draft":"✏️","read":"👁️"}.get(s,"•")
+                with st.container(border=True):
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f"**{emoji} {inv['customer']}**")
+                        st.caption(f"{inv['id']} • Due: {inv['due']}")
+                        if s == "overdue":
+                            st.error("⚠️ Overdue — Payment Pending")
+                    with col_b:
+                        st.markdown(f"**₹{inv['amount']:,.0f}**")
+                        status_colors = {
+                            "overdue": "🔴", "sent": "🔵",
+                            "draft": "⚪", "read": "🟡"
+                        }
+                        st.caption(f"{status_colors.get(s,'⚪')} {s.title()}")
+
+        if st.button("View All Invoices →", key="home_view_all", use_container_width=True):
+            st.session_state.page = "invoice"
+            st.rerun()
+
+    with right:
+        st.subheader("📊 Summary")
+
+        # Status breakdown
+        statuses = {}
+        for inv in invoices:
+            statuses[inv["status"]] = statuses.get(inv["status"], 0) + 1
+
+        icons_map = {"paid":"✅","sent":"📤","overdue":"⚠️","draft":"✏️","read":"👁️"}
+        for s, count in statuses.items():
+            col_x, col_y = st.columns([3,1])
+            col_x.write(f"{icons_map.get(s,'•')} {s.title()}")
+            col_y.write(f"**{count}**")
+
+        st.divider()
+
+        cust_count  = len(st.session_state.customers)
+        items_count = len(st.session_state.items_db)
+
+        st.info(f"👥 Customers: **{cust_count}**")
+        st.success(f"📦 Items: **{items_count}**")
+
+        if st.button("➕ Add Customer", use_container_width=True, key="home_add_cust"):
+            st.session_state.page = "customers"
+            st.rerun()
+        if st.button("➕ Add Item", use_container_width=True, key="home_add_item"):
+            st.session_state.page = "items"
+            st.rerun()te.invoices
 
     st.markdown("## 👋 Welcome back!")
     st.caption("AP Tech Care — Smart Tech Solutions")
