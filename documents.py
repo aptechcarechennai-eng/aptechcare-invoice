@@ -91,7 +91,8 @@ def _render_new_form(doc_type, cfg):
     with st.form(key=f"new_{doc_type}_form"):
         col1, col2, col3 = st.columns(3)
         with col1:
-            customer = st.selectbox("Customer *", st.session_state.customers + ["+ Add New Customer"])
+            cust_names = [c["name"] if isinstance(c, dict) else c for c in st.session_state.customers]
+            customer = st.selectbox("Customer *", cust_names + ["+ Add New Customer"])
         with col2:
             inv_no = st.text_input("Document #", value=next_id(doc_type))
         with col3:
