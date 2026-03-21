@@ -67,24 +67,31 @@ def render():
             for inv in pending[:5]:
                 is_overdue = inv["status"] == "overdue"
                 status_icon = "⚠️" if is_overdue else "→"
-                color = "#EF4444" if is_overdue else "#6B7280"
-                overdue_tag = f'<div style="font-size:11px;color:#EF4444;font-weight:700;margin-top:2px;">⚠ Overdue — Payment Pending</div>' if is_overdue else ""
+                overdue_tag = '<div style="font-size:11px;color:#EF4444;font-weight:700;margin-top:2px;">⚠ Overdue — Payment Pending</div>' if is_overdue else ""
+                badge_colors = {
+                    "overdue": ("FEE2E2", "991B1B"),
+                    "sent":    ("DBEAFE", "1E40AF"),
+                    "draft":   ("F3F4F6", "374151"),
+                    "read":    ("FEF3C7", "92400E"),
+                }
+                bg, fg = badge_colors.get(inv["status"], ("F3F4F6","374151"))
 
-                st.markdown(f"""
-                <div class="ap-card" style="margin-bottom:8px;cursor:pointer;">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                    <div>
-                      <div class="inv-customer">{status_icon} {inv["customer"]}</div>
-                      <div class="inv-meta">{inv["id"]} • Due: {inv["due"]}</div>
+                c_left, c_right = st.columns([3, 1])
+                with c_left:
+                    st.markdown(f"""
+                    <div style="padding:12px 16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:8px;">
+                      <div style="font-weight:700;font-size:14px;color:#0F1923;">{status_icon} {inv["customer"]}</div>
+                      <div style="font-size:12px;color:#6b7280;margin-top:2px;">{inv["id"]} • Due: {inv["due"]}</div>
                       {overdue_tag}
                     </div>
-                    <div style="text-align:right;">
-                      <div class="inv-amount">₹{inv["amount"]:,.0f}</div>
-                      <span class="badge-{inv['status']}" style="font-size:11px;">{inv["status"].title()}</span>
+                    """, unsafe_allow_html=True)
+                with c_right:
+                    st.markdown(f"""
+                    <div style="padding:12px 16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:8px;text-align:right;">
+                      <div style="font-weight:900;font-size:15px;color:#0F1923;">₹{inv["amount"]:,.0f}</div>
+                      <span style="background:#{bg};color:#{fg};padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;">{inv["status"].title()}</span>
                     </div>
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
         if st.button("View All Invoices →", key="home_view_all"):
             st.session_state.page = "invoice"
