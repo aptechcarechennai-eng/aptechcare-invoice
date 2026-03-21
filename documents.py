@@ -50,7 +50,7 @@ def render(doc_type="invoice"):
                 st.markdown(f'<div class="ap-card" style="text-align:center;padding:40px;color:#6b7280;">No {cfg["title"].lower()} found</div>', unsafe_allow_html=True)
             else:
                 for doc in filtered:
-                    _render_doc_row(doc, cfg)
+                    _render_doc_row(doc, cfg, flt)
 
     # ── New Doc Modal ─────────────────────────────────────────────
     if st.session_state.get("show_new_invoice") and st.session_state.get("doc_type") == doc_type:
@@ -61,7 +61,7 @@ def render(doc_type="invoice"):
         _render_print_view(st.session_state.selected_invoice, cfg)
 
 
-def _render_doc_row(doc, cfg):
+def _render_doc_row(doc, cfg, flt="all"):
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
         st.markdown(f"""
@@ -78,7 +78,7 @@ def _render_doc_row(doc, cfg):
         </div>
         """, unsafe_allow_html=True)
     with col3:
-        if st.button("👁 View", key=f"view_{doc['id']}", use_container_width=True):
+        if st.button("👁 View", key=f"view_{flt}_{doc['id']}", use_container_width=True):
             st.session_state.selected_invoice = doc
             st.rerun()
     st.markdown("<hr style='margin:4px 0;border-color:#f3f4f6;'>", unsafe_allow_html=True)
