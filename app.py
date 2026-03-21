@@ -217,18 +217,24 @@ def init_session():
         "logged_in": False,
         "user": None,
         "invoices": [
-            {"id": "AP-1001", "type": "invoice", "customer": "TechSoft Pvt Ltd", "date": "2025-06-01", "due": "2025-06-15", "amount": 18500, "status": "paid", "items": []},
-            {"id": "AP-1002", "type": "invoice", "customer": "InfoBridge Solutions", "date": "2025-06-05", "due": "2025-06-20", "amount": 32000, "status": "sent", "items": []},
-            {"id": "AP-1003", "type": "invoice", "customer": "Nexus Digital", "date": "2025-06-10", "due": "2025-06-10", "amount": 7500, "status": "overdue", "items": []},
-            {"id": "AP-1004", "type": "invoice", "customer": "CloudVerse Inc", "date": "2025-06-12", "due": "2025-06-26", "amount": 54000, "status": "draft", "items": []},
-            {"id": "AP-1005", "type": "invoice", "customer": "ByteWave Tech", "date": "2025-06-14", "due": "2025-06-28", "amount": 12300, "status": "sent", "items": []},
+            {"id": "AP-1001", "type": "invoice", "customer": "TechSoft Pvt Ltd",    "date": "2025-06-01", "due": "2025-06-15", "amount": 18500, "status": "paid",    "items": []},
+            {"id": "AP-1002", "type": "invoice", "customer": "InfoBridge Solutions","date": "2025-06-05", "due": "2025-06-20", "amount": 32000, "status": "sent",    "items": []},
+            {"id": "AP-1003", "type": "invoice", "customer": "Nexus Digital",       "date": "2025-06-10", "due": "2025-06-10", "amount": 7500,  "status": "overdue", "items": []},
+            {"id": "AP-1004", "type": "invoice", "customer": "CloudVerse Inc",      "date": "2025-06-12", "due": "2025-06-26", "amount": 54000, "status": "draft",   "items": []},
+            {"id": "AP-1005", "type": "invoice", "customer": "ByteWave Tech",       "date": "2025-06-14", "due": "2025-06-28", "amount": 12300, "status": "sent",    "items": []},
         ],
-        "customers": ["TechSoft Pvt Ltd", "InfoBridge Solutions", "Nexus Digital", "CloudVerse Inc", "ByteWave Tech"],
+        "customers": [
+            {"name": "TechSoft Pvt Ltd",    "email": "techsoft@example.com",  "phone": "9800001111", "address": "Chennai"},
+            {"name": "InfoBridge Solutions","email": "info@infobridge.com",   "phone": "9800002222", "address": "Bangalore"},
+            {"name": "Nexus Digital",       "email": "hello@nexusdigital.in", "phone": "9800003333", "address": "Hyderabad"},
+            {"name": "CloudVerse Inc",      "email": "admin@cloudverse.io",   "phone": "9800004444", "address": "Mumbai"},
+            {"name": "ByteWave Tech",       "email": "support@bytewave.in",   "phone": "9800005555", "address": "Pune"},
+        ],
         "items_db": [
-            {"name": "AMC Service", "code": "AMC001", "price": 5000, "unit": "per year", "desc": "Annual Maintenance Contract"},
-            {"name": "Hardware Repair", "code": "HW002", "price": 1500, "unit": "per unit", "desc": "Hardware diagnosis and repair"},
-            {"name": "Software Install", "code": "SW003", "price": 800, "unit": "per device", "desc": "Software installation and setup"},
-            {"name": "Network Setup", "code": "NW004", "price": 3500, "unit": "per job", "desc": "Network configuration and setup"},
+            {"name": "AMC Service",      "code": "AMC001", "price": 5000, "unit": "per year",   "desc": "Annual Maintenance Contract"},
+            {"name": "Hardware Repair",  "code": "HW002",  "price": 1500, "unit": "per unit",   "desc": "Hardware diagnosis and repair"},
+            {"name": "Software Install", "code": "SW003",  "price": 800,  "unit": "per device", "desc": "Software installation and setup"},
+            {"name": "Network Setup",    "code": "NW004",  "price": 3500, "unit": "per job",    "desc": "Network configuration and setup"},
         ],
         "settings": {
             "company_name": "AP Tech Care",
@@ -252,6 +258,12 @@ def init_session():
         if k not in st.session_state:
             st.session_state[k] = v
 
+    # Safe migration: convert string customers to dicts if needed
+    st.session_state.customers = [
+        {"name": c, "email": "", "phone": "", "address": ""} if isinstance(c, str) else c
+        for c in st.session_state.customers
+    ]
+
 init_session()
 
 # ── APPLY THEME ──────────────────────────────────────────────────
@@ -274,7 +286,7 @@ def fmt_date(date_str):
     try:
         d = datetime.strptime(str(date_str), "%Y-%m-%d")
         fmt = st.session_state.settings.get("date_format", "DD/MM/YYYY")
-        if fmt == "DD/MM/YYYY": return d.strftime("%d/%m/%Y")
+        if fmt == "DD/MM/YYYY":   return d.strftime("%d/%m/%Y")
         elif fmt == "MM/DD/YYYY": return d.strftime("%m/%d/%Y")
         elif fmt == "YYYY/MM/DD": return d.strftime("%Y/%m/%d")
         elif fmt == "19 Jun 2025": return d.strftime("%d %b %Y")
@@ -289,7 +301,6 @@ def nav(page):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────
 with st.sidebar:
-    # Logo
     st.markdown("""
     <div style="padding:16px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom:8px;">
       <div style="display:flex; align-items:center; gap:10px;">
@@ -306,43 +317,50 @@ with st.sidebar:
 
     cur = st.session_state.page
 
-    # Main nav
+    # Active nav highlight via CSS
+    st.markdown(f"""
+    <style>
+    [data-testid="stSidebar"] [data-testid="stButton-nav_{cur}"] > button {{
+        background: rgba(0,200,150,0.18) !important;
+        color: #00C896 !important;
+        font-weight: 700 !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
     nav_items = [
-        ("home", "🏠", "Home"),
-        ("invoice", "📄", "Invoice"),
+        ("home",     "🏠", "Home"),
+        ("invoice",  "📄", "Invoice"),
         ("estimate", "📋", "Estimate"),
-        ("credit", "💳", "Credit Notes"),
+        ("credit",   "💳", "Credit Notes"),
         ("delivery", "🚚", "Delivery Notes"),
         ("purchase", "🛒", "Purchase Order"),
     ]
     for pid, icon, label in nav_items:
-        active = cur == pid
-        btn_style = "color:#00C896 !important; background:rgba(0,200,150,0.15) !important;" if active else ""
         if st.button(f"{icon}  {label}", key=f"nav_{pid}", use_container_width=True):
             nav(pid)
 
     st.markdown('<div style="border-top:1px solid rgba(255,255,255,0.08);margin:8px 0;padding-top:4px;"><span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:700;letter-spacing:1px;padding:0 16px;">MORE</span></div>', unsafe_allow_html=True)
 
     more_items = [
-        ("cashflow", "📊", "Cash Flow"),
-        ("reports", "📈", "Reports"),
-        ("items", "📦", "Items"),
-        ("customers", "👥", "Customers"),
-        ("settings", "⚙️", "Settings"),
+        ("cashflow",   "📊", "Cash Flow"),
+        ("reports",    "📈", "Reports"),
+        ("items",      "📦", "Items"),
+        ("customers",  "👥", "Customers"),
+        ("settings",   "⚙️", "Settings"),
     ]
     for pid, icon, label in more_items:
         if st.button(f"{icon}  {label}", key=f"nav_{pid}", use_container_width=True):
             nav(pid)
 
-    # Logout at bottom
-    st.markdown('<div style="position:absolute;bottom:0;left:0;right:0;padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">', unsafe_allow_html=True)
+    st.markdown('<div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:8px;padding-top:8px;">', unsafe_allow_html=True)
     if st.button("🚪  Logout", key="nav_logout", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.user = None
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ── PAGE IMPORTS ─────────────────────────────────────────────────
+# ── PAGE ROUTING ─────────────────────────────────────────────────
 page = st.session_state.page
 
 if page == "home":
