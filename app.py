@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="AP Tech Care",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="expanded"
 )
 
 # ── THEME CSS ────────────────────────────────────────────────────
@@ -48,13 +48,11 @@ html, body, [class*="css"] {{
 }}
 
 /* Hide default streamlit elements */
-/* Hide sidebar collapse arrow permanently */
-[data-testid="collapsedControl"] {{ display: none !important; }}
-[data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
-button[kind="header"] {{ display: none !important; }}
-
 #MainMenu, footer, header {{ visibility: hidden; }}
 .block-container {{ padding: 1.5rem 2rem 2rem !important; max-width: 100% !important; }}
+
+/* ── Hide ONLY the << collapse arrow inside sidebar ── */
+[data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
 
 /* Main background */
 .stApp {{ background: {t["bg"]} !important; }}
@@ -106,15 +104,15 @@ button[kind="header"] {{ display: none !important; }}
 .stat-value {{ font-size: 28px; font-weight: 900; color: {t["text"]}; margin: 6px 0 0; }}
 
 /* Badges */
-.badge-paid {{ background: {t["badge_paid"]}; color: {t["badge_paid_text"]}; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
+.badge-paid    {{ background: {t["badge_paid"]};    color: {t["badge_paid_text"]};    padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
 .badge-overdue {{ background: {t["badge_overdue"]}; color: {t["badge_overdue_text"]}; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-.badge-sent {{ background: {t["badge_sent"]}; color: {t["badge_sent_text"]}; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-.badge-draft {{ background: {t["badge_draft"]}; color: {t["badge_draft_text"]}; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-.badge-read {{ background: #FEF3C7; color: #92400E; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
+.badge-sent    {{ background: {t["badge_sent"]};    color: {t["badge_sent_text"]};    padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
+.badge-draft   {{ background: {t["badge_draft"]};   color: {t["badge_draft_text"]};   padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
+.badge-read    {{ background: #FEF3C7; color: #92400E; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
 
 /* Page title */
 .page-title {{ font-size: 24px; font-weight: 900; color: {t["text"]}; margin: 0 0 4px; }}
-.page-sub {{ font-size: 13px; color: {t["sub"]}; margin: 0 0 24px; }}
+.page-sub   {{ font-size: 13px; color: {t["sub"]}; margin: 0 0 24px; }}
 
 /* Invoice row */
 .inv-row {{
@@ -131,16 +129,8 @@ button[kind="header"] {{ display: none !important; }}
 }}
 .inv-row:hover {{ border-color: {t["accent"]}; box-shadow: 0 2px 8px rgba(0,200,150,0.12); }}
 .inv-customer {{ font-weight: 700; color: {t["text"]}; font-size: 14px; }}
-.inv-meta {{ font-size: 12px; color: {t["sub"]}; margin-top: 2px; }}
-.inv-amount {{ font-weight: 900; font-size: 16px; color: {t["text"]}; text-align: right; }}
-
-/* Section header */
-.section-header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}}
+.inv-meta     {{ font-size: 12px; color: {t["sub"]}; margin-top: 2px; }}
+.inv-amount   {{ font-weight: 900; font-size: 16px; color: {t["text"]}; text-align: right; }}
 
 /* Accent button */
 .stButton > button[kind="primary"] {{
@@ -163,15 +153,6 @@ button[kind="header"] {{ display: none !important; }}
 
 /* Divider */
 .ap-divider {{ border: none; border-top: 1px solid {t["border"]}; margin: 20px 0; }}
-
-/* Logo box */
-.logo-box {{
-    background: #0F1923;
-    border-radius: 12px;
-    width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 8px;
-}}
 
 /* Alert box */
 .ap-alert-overdue {{
@@ -263,7 +244,7 @@ def init_session():
         if k not in st.session_state:
             st.session_state[k] = v
 
-    # Safe migration: convert string customers to dicts if needed
+    # Safe migration: convert string customers to dicts
     st.session_state.customers = [
         {"name": c, "email": "", "phone": "", "address": ""} if isinstance(c, str) else c
         for c in st.session_state.customers
@@ -276,9 +257,9 @@ theme = st.session_state.settings.get("theme", "default")
 st.markdown(get_theme_css(theme), unsafe_allow_html=True)
 
 # ── HELPERS ──────────────────────────────────────────────────────
-def badge(status):
-    labels = {"paid": "✓ Paid", "sent": "→ Sent", "overdue": "⚠ Overdue", "draft": "✎ Draft", "read": "👁 Read"}
-    return f'<span class="badge-{status}">{labels.get(status, status.title())}</span>'
+def nav(page):
+    st.session_state.page = page
+    st.rerun()
 
 def fmt_currency(amount):
     s = st.session_state.settings
@@ -291,26 +272,23 @@ def fmt_date(date_str):
     try:
         d = datetime.strptime(str(date_str), "%Y-%m-%d")
         fmt = st.session_state.settings.get("date_format", "DD/MM/YYYY")
-        if fmt == "DD/MM/YYYY":   return d.strftime("%d/%m/%Y")
-        elif fmt == "MM/DD/YYYY": return d.strftime("%m/%d/%Y")
-        elif fmt == "YYYY/MM/DD": return d.strftime("%Y/%m/%d")
+        if fmt == "DD/MM/YYYY":    return d.strftime("%d/%m/%Y")
+        elif fmt == "MM/DD/YYYY":  return d.strftime("%m/%d/%Y")
+        elif fmt == "YYYY/MM/DD":  return d.strftime("%Y/%m/%d")
         elif fmt == "19 Jun 2025": return d.strftime("%d %b %Y")
-        elif fmt == "Jun 19, 2025": return d.strftime("%b %d, %Y")
+        elif fmt == "Jun 19, 2025":return d.strftime("%b %d, %Y")
         return d.strftime("%d/%m/%Y")
     except:
         return str(date_str)
 
-def nav(page):
-    st.session_state.page = page
-    st.rerun()
-
 # ── SIDEBAR ───────────────────────────────────────────────────────
 with st.sidebar:
+    # Logo
     st.markdown("""
-    <div style="padding:16px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom:8px;">
+    <div style="padding:16px 16px 12px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:8px;">
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="width:44px;height:44px;border-radius:12px;background:#00C896;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <span style="color:#fff;font-weight:900;font-size:14px;letter-spacing:0.5px;">AP</span>
+          <span style="color:#fff;font-weight:900;font-size:14px;">AP</span>
         </div>
         <div>
           <div style="font-weight:800;font-size:15px;color:#fff;line-height:1.2;">AP Tech Care</div>
@@ -322,7 +300,7 @@ with st.sidebar:
 
     cur = st.session_state.page
 
-    # Active nav highlight via CSS
+    # Active nav highlight
     st.markdown(f"""
     <style>
     [data-testid="stSidebar"] [data-testid="stButton-nav_{cur}"] > button {{
@@ -348,44 +326,49 @@ with st.sidebar:
     st.markdown('<div style="border-top:1px solid rgba(255,255,255,0.08);margin:8px 0;padding-top:4px;"><span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:700;letter-spacing:1px;padding:0 16px;">MORE</span></div>', unsafe_allow_html=True)
 
     more_items = [
-        ("cashflow",   "📊", "Cash Flow"),
-        ("reports",    "📈", "Reports"),
-        ("items",      "📦", "Items"),
-        ("customers",  "👥", "Customers"),
-        ("settings",   "⚙️", "Settings"),
+        ("cashflow",  "📊", "Cash Flow"),
+        ("reports",   "📈", "Reports"),
+        ("items",     "📦", "Items"),
+        ("customers", "👥", "Customers"),
+        ("settings",  "⚙️", "Settings"),
     ]
     for pid, icon, label in more_items:
         if st.button(f"{icon}  {label}", key=f"nav_{pid}", use_container_width=True):
             nav(pid)
 
-    st.markdown('<div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:8px;padding-top:8px;">', unsafe_allow_html=True)
+    st.markdown("---")
     if st.button("🚪  Logout", key="nav_logout", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.user = None
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── BACK TO HOME BUTTON (shown on all non-home pages) ────────────
+if st.session_state.page != "home":
+    if st.button("← Back to Home", key="global_back_home"):
+        nav("home")
+    st.markdown("<div class='ap-divider'></div>", unsafe_allow_html=True)
 
 # ── PAGE ROUTING ─────────────────────────────────────────────────
 page = st.session_state.page
 
 if page == "home":
-    from home import render
+    from pages.Home import render
     render()
 elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
-    from documents import render
+    from pages.documents import render
     render(page)
 elif page == "cashflow":
-    from cashflow import render
+    from pages.cashflow import render
     render()
 elif page == "reports":
-    from reports import render
+    from pages.reports import render
     render()
 elif page == "items":
-    from items import render
+    from pages.items import render
     render()
 elif page == "customers":
-    from customers import render
+    from pages.customers import render
     render()
 elif page == "settings":
-    from settings import render
+    from pages.settings import render
     render()
