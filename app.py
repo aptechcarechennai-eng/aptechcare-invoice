@@ -48,6 +48,11 @@ html, body, [class*="css"] {{
 }}
 
 /* Hide default streamlit elements */
+/* Hide sidebar collapse arrow permanently */
+[data-testid="collapsedControl"] {{ display: none !important; }}
+[data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
+button[kind="header"] {{ display: none !important; }}
+
 #MainMenu, footer, header {{ visibility: hidden; }}
 .block-container {{ padding: 1.5rem 2rem 2rem !important; max-width: 100% !important; }}
 
