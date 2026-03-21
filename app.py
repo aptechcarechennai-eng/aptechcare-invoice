@@ -14,9 +14,15 @@ def get_theme_css():
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
 #MainMenu, footer, header { visibility: hidden; }
+
+/* Hide collapse arrow but keep sidebar always open */
 [data-testid="stSidebarCollapseButton"] { display: none !important; }
+[data-testid="collapsedControl"]        { display: none !important; }
+section[data-testid="stSidebar"]        { min-width: 220px !important; transform: none !important; }
+
 .block-container { padding: 2rem 2.5rem 2rem !important; max-width: 100% !important; }
 .stApp { background: #F5F6FA !important; }
+
 [data-testid="stSidebar"] {
     background: #FFFFFF !important;
     border-right: 1px solid #E8EAED !important;
@@ -71,7 +77,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
 </style>
 """
 
-# ── SESSION INIT ──────────────────────────────────────────────────
 def init_session():
     defaults = {
         "page": "home",
@@ -120,7 +125,6 @@ def nav(page):
     st.session_state.page = page
     st.rerun()
 
-# ── SIDEBAR ───────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style="padding:20px 16px 16px;">
@@ -137,8 +141,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     cur = st.session_state.page
-    st.markdown(f"""
-    <style>
+    st.markdown(f"""<style>
     [data-testid="stSidebar"] [data-testid="stButton-nav_{cur}"] > button {{
         background:#EEF2FF !important; color:#4F46E5 !important; font-weight:600 !important;
     }}
@@ -165,34 +168,28 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
 
-# ── BACK BUTTON ───────────────────────────────────────────────────
 if st.session_state.page != "home":
     if st.button("← Home", key="global_back"):
         nav("home")
     st.markdown("<div class='ap-divider'></div>", unsafe_allow_html=True)
 
-# ── HOME PAGE (inline — no import needed) ─────────────────────────
 def render_home():
     invoices = st.session_state.invoices
-
     st.markdown('<p class="page-title">Dashboard</p>', unsafe_allow_html=True)
     st.markdown('<p class="page-sub">AP Tech Care — Smart Tech Solutions</p>', unsafe_allow_html=True)
 
-    # Stats
     total       = len(invoices)
     paid_amt    = sum(i["amount"] for i in invoices if i["status"] == "paid")
     pending_amt = sum(i["amount"] for i in invoices if i["status"] != "paid")
     overdue_n   = len([i for i in invoices if i["status"] == "overdue"])
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1,c2,c3,c4 = st.columns(4)
     with c1: st.metric("Total Invoices", total)
     with c2: st.metric("Collected",      f"₹{paid_amt/1000:.1f}K")
     with c3: st.metric("Outstanding",    f"₹{pending_amt/1000:.1f}K")
     with c4: st.metric("Overdue",        overdue_n)
 
     st.markdown("<div class='ap-divider'></div>", unsafe_allow_html=True)
-
-    # Quick Actions
     st.markdown("<p style='font-size:11px;font-weight:600;color:#9CA3AF;letter-spacing:1px;margin-bottom:10px;'>QUICK ACTIONS</p>", unsafe_allow_html=True)
     q1,q2,q3,q4,q5,q6 = st.columns(6)
     for col, pid, icon, label in [
@@ -205,9 +202,7 @@ def render_home():
                 nav(pid)
 
     st.markdown("<div class='ap-divider'></div>", unsafe_allow_html=True)
-
-    # Pending + Summary
-    left, right = st.columns([2, 1])
+    left, right = st.columns([2,1])
 
     with left:
         st.markdown("<p style='font-size:14px;font-weight:600;color:#111827;margin-bottom:10px;'>Unpaid Invoices</p>", unsafe_allow_html=True)
@@ -222,19 +217,15 @@ def render_home():
                 overdue_dot = '<span style="font-size:11px;color:#EF4444;font-weight:600;">● Overdue</span>' if is_overdue else ""
                 cl, cr = st.columns([3,1])
                 with cl:
-                    st.markdown(f"""
-                    <div class="ap-card" style="margin-bottom:6px;">
+                    st.markdown(f"""<div class="ap-card" style="margin-bottom:6px;">
                       <div style="font-weight:600;font-size:14px;color:#111827;">{inv['customer']}</div>
-                      <div style="font-size:12px;color:#9CA3AF;margin-top:2px;">{inv['id']} &nbsp;•&nbsp; Due: {inv['due']}</div>
-                      {overdue_dot}
-                    </div>""", unsafe_allow_html=True)
+                      <div style="font-size:12px;color:#9CA3AF;margin-top:2px;">{inv['id']} • Due: {inv['due']}</div>
+                      {overdue_dot}</div>""", unsafe_allow_html=True)
                 with cr:
-                    st.markdown(f"""
-                    <div class="ap-card" style="margin-bottom:6px;text-align:right;">
+                    st.markdown(f"""<div class="ap-card" style="margin-bottom:6px;text-align:right;">
                       <div style="font-weight:700;font-size:14px;color:#111827;">₹{inv['amount']:,.0f}</div>
                       <span style="background:{bg};color:{fg};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">{inv['status'].title()}</span>
                     </div>""", unsafe_allow_html=True)
-
         if st.button("View All Invoices →", key="home_view_all"):
             nav("invoice")
 
@@ -245,11 +236,9 @@ def render_home():
             statuses[inv["status"]] = statuses.get(inv["status"], 0) + 1
         status_colors = {"paid":"#166534","sent":"#1E40AF","overdue":"#991B1B","draft":"#6B7280","read":"#854D0E"}
         for status, count in statuses.items():
-            color = status_colors.get(status, "#6B7280")
-            st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:10px 14px;background:#fff;border:1px solid #E8EAED;
-                        border-radius:10px;margin-bottom:6px;">
+            color = status_colors.get(status,"#6B7280")
+            st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
+                padding:10px 14px;background:#fff;border:1px solid #E8EAED;border-radius:10px;margin-bottom:6px;">
               <span style="font-size:13px;color:#374151;">{status.title()}</span>
               <span style="font-weight:700;font-size:13px;color:{color};">{count}</span>
             </div>""", unsafe_allow_html=True)
@@ -257,8 +246,7 @@ def render_home():
         st.markdown("<div class='ap-divider'></div>", unsafe_allow_html=True)
         cust_count  = len(st.session_state.customers)
         items_count = len(st.session_state.items_db)
-        st.markdown(f"""
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+        st.markdown(f"""<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;padding:10px 14px;background:#EEF2FF;border-radius:10px;">
             <span style="font-size:13px;color:#374151;">👥 Customers</span>
             <span style="font-weight:700;font-size:13px;color:#4F46E5;">{cust_count}</span>
@@ -273,11 +261,10 @@ def render_home():
         if st.button("➕ New Item", use_container_width=True, key="home_add_item"):
             nav("items")
 
-# ── PAGE ROUTING ──────────────────────────────────────────────────
 page = st.session_state.page
 
 if page == "home":
-    render_home()   # ← no import, no file name issue!
+    render_home()
 elif page in ["invoice","estimate","credit","delivery","purchase"]:
     from pages.documents import render
     render(page)
