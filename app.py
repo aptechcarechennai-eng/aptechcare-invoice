@@ -364,23 +364,23 @@ with st.sidebar:
 page = st.session_state.page
 
 if page == "home":
-    from home import render
+    from pages.Home import render
     render()
 elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
-    from documents import render
+    from pages.documents import render
     render(page)
 elif page == "cashflow":
-    from cashflow import render
+    from pages.cashflow import render
     render()
 elif page == "reports":
-    from reports import render
+    from pages.reports import render
     render()
 elif page == "items":
-    from items import render
+    from pages.items import render
     render()
 elif page == "customers":
-    from customers import render
+    from pages.customers import render
     render()
 elif page == "settings":
-    from settings import render
+    from pages.settings import render
     render()
