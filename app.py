@@ -278,7 +278,7 @@ if st.session_state.page != "home":
 page = st.session_state.page
 
 if page == "home":
-    from pages.Home import render
+    from pages.home import render
     render()
 elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
     from pages.documents import render
