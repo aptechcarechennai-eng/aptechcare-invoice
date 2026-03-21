@@ -364,7 +364,7 @@ with st.sidebar:
 page = st.session_state.page
 
 if page == "home":
-    from pages.home import render
+    from pages.Home import render
     render()
 elif page in ["invoice", "estimate", "credit", "delivery", "purchase"]:
     from pages.documents import render
