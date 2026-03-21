@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="AP Tech Care",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # ── THEME CSS ────────────────────────────────────────────────────
