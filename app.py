@@ -197,7 +197,22 @@ def render_documents(doc_type):
 
     if st.session_state.get("selected_invoice"):
         doc=st.session_state.selected_invoice; s=st.session_state.settings
-        if st.button("← Back to List",key="print_back"): st.session_state.selected_invoice=None; st.rerun()
+        cb, cw, ce, cp = st.columns([1,1,1,1])
+        with cb:
+            if st.button("← Back",key="print_back",use_container_width=True):
+                st.session_state.selected_invoice=None; st.rerun()
+        with cw:
+            phone = doc.get("customer_phone","")
+            msg = f"Dear {doc['customer']}, your {cfg['header']} {doc['id']} of ₹{doc.get('amount',0):,.0f} is due on {doc['due']}. Please transfer to: {st.session_state.settings.get('payment_instructions','').split(chr(10))[0] if st.session_state.settings.get('payment_instructions') else ''}. Thank you - {st.session_state.settings.get('company_name','AP Tech Care')}"
+            import urllib.parse
+            wa_url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+            st.markdown(f'<a href="{wa_url}" target="_blank"><button style="width:100%;padding:8px;background:#25D366;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">💬 WhatsApp</button></a>', unsafe_allow_html=True)
+        with ce:
+            subject = urllib.parse.quote(f"{cfg['header']} {doc['id']} from {st.session_state.settings.get('company_name','AP Tech Care')}")
+            body = urllib.parse.quote(f"Dear {doc['customer']},\n\nPlease find your {cfg['header']} {doc['id']} for ₹{doc.get('amount',0):,.0f} due on {doc['due']}.\n\nThank you,\n{st.session_state.settings.get('company_name','AP Tech Care')}")
+            st.markdown(f'<a href="mailto:?subject={subject}&body={body}"><button style="width:100%;padding:8px;background:#4F46E5;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">📧 Email</button></a>', unsafe_allow_html=True)
+        with cp:
+            st.markdown('<button onclick="window.print()" style="width:100%;padding:8px;background:#111827;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">🖨️ Print</button>', unsafe_allow_html=True)
         items=doc.get("items",[]); subtotal=doc.get("subtotal",sum(i.get("amount",0) for i in items))
         tax_rate=s.get("tax_rate",18); tax=doc.get("tax",int(subtotal*tax_rate/100)); total=doc.get("amount",subtotal+tax)
         rows=""
@@ -247,6 +262,52 @@ def render_documents(doc_type):
             <div style="margin-top:24px;padding-top:16px;border-top:1px solid #E8EAED;font-size:12px;color:#6B7280;">{s.get("payment_instructions","").replace(chr(10),"<br>")}</div>
             <div style="margin-top:16px;text-align:center;font-size:11px;color:#9CA3AF;">Thank you! — {s.get("company_name","AP Tech Care")}</div>
           </div></div>""",unsafe_allow_html=True)
+
+        # PDF Download
+        pdf_html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <style>body{{font-family:Arial,sans-serif;margin:0;padding:20px;}}
+        table{{width:100%;border-collapse:collapse;}}
+        th{{background:#4F46E5;color:white;padding:10px 14px;text-align:left;font-size:12px;}}
+        td{{padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;}}
+        .total-row{{background:#4F46E5;color:white;padding:10px 12px;border-radius:6px;}}
+        @media print{{button{{display:none!important;}}.no-print{{display:none!important;}}}}
+        </style></head><body>
+        <div style="display:flex;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid #f3f4f6;">
+          <div><h2 style="margin:0;color:#111827;">{s.get("company_name","AP Tech Care")}</h2>
+          <p style="margin:4px 0;color:#6b7280;font-size:12px;">{s.get("company_address1","")}</p>
+          <p style="margin:4px 0;color:#6b7280;font-size:12px;">{s.get("company_phone","")}</p>
+          <p style="margin:4px 0;color:#6b7280;font-size:12px;">GST: {s.get("gst_no","")}</p></div>
+          <div style="text-align:right;"><h1 style="color:#4F46E5;margin:0;">{cfg["header"]}</h1>
+          <p style="font-size:16px;font-weight:bold;margin:4px 0;">{doc["id"]}</p>
+          <p style="color:#6b7280;font-size:12px;margin:4px 0;">Date: {doc["date"]}</p>
+          <p style="color:#6b7280;font-size:12px;margin:4px 0;">Due: {doc["due"]}</p></div>
+        </div>
+        <div style="background:#f8f9fa;padding:12px 16px;border-radius:8px;margin:16px 0;">
+          <p style="font-size:10px;color:#9ca3af;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">Bill To</p>
+          <h3 style="margin:0;color:#111827;">{doc["customer"]}</h3>
+        </div>
+        <table><thead><tr>{"".join(f'<th>{h}</th>' for h in ["#","Item","Qty","Rate","Amount"])}</tr></thead>
+        <tbody>{"".join(f"<tr><td>{i+1}</td><td>{it.get('name','')}</td><td style='text-align:center'>{it.get('qty',1)}</td><td style='text-align:right'>Rs.{it.get('price',0):,}</td><td style='text-align:right;font-weight:bold'>Rs.{it.get('amount',0):,}</td></tr>" for i,it in enumerate(items))}</tbody>
+        </table>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+          <div style="width:240px;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e5e7eb;"><span style="color:#6b7280;">Subtotal</span><span>Rs.{subtotal:,}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e5e7eb;"><span style="color:#6b7280;">GST ({tax_rate}%)</span><span>Rs.{tax:,}</span></div>
+            <div class="total-row" style="display:flex;justify-content:space-between;margin-top:6px;"><span style="font-weight:bold;">Total</span><span style="font-weight:bold;">Rs.{total:,}</span></div>
+          </div>
+        </div>
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">{s.get("payment_instructions","").replace(chr(10),"<br>")}</div>
+        <p style="text-align:center;font-size:11px;color:#9ca3af;margin-top:16px;">Thank you for your business! — {s.get("company_name","AP Tech Care")}</p>
+        </body></html>"""
+
+        st.download_button(
+            label="⬇️ Download PDF",
+            data=pdf_html.encode("utf-8"),
+            file_name=f"{doc['id']}.html",
+            mime="text/html",
+            use_container_width=False,
+        )
+        st.caption("💡 Open downloaded file in browser → Ctrl+P → Save as PDF")
         return
 
     if st.session_state.get("show_new_invoice") and st.session_state.get("doc_type")==doc_type:
@@ -489,6 +550,7 @@ def render_settings():
             b64=base64.b64encode(logo_file.read()).decode()
             s["logo_b64"]=b64
             st.success("✅ Logo uploaded!")
+            st.rerun()
         if s.get("logo_b64"):
             st.markdown(f'<img src="data:image/png;base64,{s["logo_b64"]}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;margin-bottom:12px;">',unsafe_allow_html=True)
             if st.button("🗑️ Remove Logo"): s["logo_b64"]=None; st.rerun()
