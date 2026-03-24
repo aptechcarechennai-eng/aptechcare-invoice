@@ -179,7 +179,7 @@ def init():
         {"name":"Network Setup",    "code":"NW004", "price":3500, "unit":"per job"},
       ],
       "settings":{
-        "company_name":"AP Tech Care","Smart Tech Solution","T.ArunPrasad, BE., MBA." ,"company_email":"aptechcare.chennai@gmail.com",
+        "company_name":"AP Tech Care","Smart Tech Solution","T.ArunPrasad.BE.MBA.","company_email":"aptechcare.chennai@gmail.com",
         "company_phone":"9940147658",
         "company_address1":"1/4A, Kamaraj Cross Street, Ambal Nagar, Ramapuram,",
         "company_address2":"Chennai, Tamilnadu 600 089",
