@@ -170,16 +170,8 @@ def init():
       "show_new_inv":False,"new_inv_type":"invoice","n_rows":1,
       "show_add_cust":False,"edit_cust_idx":None,
       "show_add_item":False,"edit_item_idx":None,
-      "invoices":[
-        {"id":"AP-1001","type":"invoice","customer":"TechSoft Pvt Ltd",    "date":"2025-06-01","due":"2025-06-15","amount":18500,"status":"paid",   "items":[],"subtotal":18500,"tax":0,"tax_rate":0},
-        {"id":"AP-1002","type":"invoice","customer":"InfoBridge Solutions", "date":"2025-06-05","due":"2025-06-20","amount":32000,"status":"sent",   "items":[],"subtotal":32000,"tax":0,"tax_rate":0},
-        {"id":"AP-1003","type":"invoice","customer":"Nexus Digital",        "date":"2025-06-10","due":"2025-06-10","amount":7500, "status":"overdue","items":[],"subtotal":7500, "tax":0,"tax_rate":0},
-      ],
-      "customers":[
-        {"name":"TechSoft Pvt Ltd",    "email":"techsoft@example.com", "phone":"9800001111","address":"Chennai"},
-        {"name":"InfoBridge Solutions","email":"info@infobridge.com",   "phone":"9800002222","address":"Bangalore"},
-        {"name":"Nexus Digital",       "email":"hello@nexusdigital.in", "phone":"9800003333","address":"Hyderabad"},
-      ],
+      "invoices":[],
+      "customers":[],
       "items_db":[
         {"name":"General Service",  "code":"GS001", "price":500,  "unit":"per visit"},
         {"name":"AMC Service",      "code":"AMC001","price":5000, "unit":"per year"},
@@ -195,7 +187,7 @@ def init():
         "company_tagline":"Smart Tech Solutions",
         "owner_name":"T.Arunprasad, BE., MBA.,",
         "gst_no":"","currency":"INR","date_format":"DD/MM/YYYY","tax_rate":0,
-        "logo_b64":None,"next_invoice_no":1004,
+        "logo_b64":None,"next_invoice_no":1001,
         "accounts":["Cash","UPI / GPay","Bank Transfer"],
         "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad, BE., MBA.\nGpay No: 9940147658",
       },
@@ -335,17 +327,20 @@ def page_documents(dtype):
         with hc3:
             st.markdown(f'<div style="text-align:right;padding-top:5px"><b>{doc["id"]}</b> <span style="background:{bg};color:{fg};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">{doc["status"].title()}</span></div>',unsafe_allow_html=True)
 
-        a1,a2,a3,a4=st.columns(4)
+        a1,a2,a3,a4,a5=st.columns(5)
         with a1:
             if st.button("👁 Preview",key="ap",use_container_width=True,type="primary" if action=="preview" else "secondary"):
                 st.session_state.inv_action="preview"; st.rerun()
         with a2:
+            if st.button("✏️ Edit",key="aedit",use_container_width=True,type="primary" if action=="edit" else "secondary"):
+                st.session_state.inv_action="edit"; st.rerun()
+        with a3:
             if st.button("📤 Send",key="as",use_container_width=True,type="primary" if action=="send" else "secondary"):
                 st.session_state.inv_action="send"; st.rerun()
-        with a3:
+        with a4:
             if st.button("💰 Payment",key="apay",use_container_width=True,type="primary" if action=="pay" else "secondary"):
                 st.session_state.inv_action="pay"; st.rerun()
-        with a4:
+        with a5:
             if st.button("✕ Cancel",key="acan",use_container_width=True):
                 st.session_state.inv_action="cancel"; st.rerun()
         st.markdown("<div class='div'></div>",unsafe_allow_html=True)
@@ -354,6 +349,108 @@ def page_documents(dtype):
 
         if action=="preview":
             components.html(html, height=900, scrolling=True)
+
+        elif action=="edit":
+            st.markdown(f"### ✏️ Edit {cfg['doc_label']} — {doc['id']}")
+            cust_names=[c["name"] if isinstance(c,dict) else c for c in st.session_state.customers]
+            cust_map={c["name"]:c for c in st.session_state.customers if isinstance(c,dict)}
+            inames=[i["name"] for i in st.session_state.items_db]
+            iprices={i["name"]:i["price"] for i in st.session_state.items_db}
+
+            # Customer field outside form for live suggestions
+            ek_name=f"edit_cname_{doc['id']}"; ek_phone=f"edit_cph_{doc['id']}"; ek_addr=f"edit_cad_{doc['id']}"; ek_email=f"edit_cem_{doc['id']}"
+            if ek_name not in st.session_state: st.session_state[ek_name]=doc.get("customer","")
+            if ek_phone not in st.session_state:
+                c2=cust_map.get(doc.get("customer",""),{}); st.session_state[ek_phone]=c2.get("phone","")
+            if ek_addr not in st.session_state:
+                c2=cust_map.get(doc.get("customer",""),{}); st.session_state[ek_addr]=c2.get("address","")
+            if ek_email not in st.session_state:
+                c2=cust_map.get(doc.get("customer",""),{}); st.session_state[ek_email]=c2.get("email","")
+
+            st.markdown('<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Customer *</p>',unsafe_allow_html=True)
+            etyped=st.text_input("Customer",value=st.session_state[ek_name],placeholder="Type name...",label_visibility="collapsed",key=f"ectype_{doc['id']}")
+            if etyped!=st.session_state[ek_name]:
+                st.session_state[ek_name]=etyped
+                if etyped in cust_map:
+                    c2=cust_map[etyped]; st.session_state[ek_phone]=c2.get("phone",""); st.session_state[ek_addr]=c2.get("address",""); st.session_state[ek_email]=c2.get("email","")
+                else:
+                    st.session_state[ek_phone]=""; st.session_state[ek_addr]=""; st.session_state[ek_email]=""
+                st.rerun()
+            if etyped and etyped not in cust_map:
+                matches=[n for n in cust_names if etyped.lower() in n.lower()]
+                if matches:
+                    scols=st.columns(min(len(matches),4))
+                    for i,m in enumerate(matches[:4]):
+                        with scols[i]:
+                            if st.button(f"👤 {m}",key=f"esug_{doc['id']}_{i}",use_container_width=True):
+                                c2=cust_map.get(m,{}); st.session_state[ek_name]=m; st.session_state[ek_phone]=c2.get("phone",""); st.session_state[ek_addr]=c2.get("address",""); st.session_state[ek_email]=c2.get("email",""); st.rerun()
+            ed1,ed2,ed3=st.columns(3)
+            with ed1:
+                eph=st.text_input("📞 Phone",value=st.session_state[ek_phone],key=f"ephf_{doc['id']}")
+                if eph!=st.session_state[ek_phone]: st.session_state[ek_phone]=eph
+            with ed2:
+                ead=st.text_input("📍 Address",value=st.session_state[ek_addr],key=f"eadf_{doc['id']}")
+                if ead!=st.session_state[ek_addr]: st.session_state[ek_addr]=ead
+            with ed3:
+                eem=st.text_input("✉️ Email",value=st.session_state[ek_email],key=f"eemf_{doc['id']}")
+                if eem!=st.session_state[ek_email]: st.session_state[ek_email]=eem
+
+            with st.form(f"detail_edit_{doc['id']}"):
+                ef1,ef2,ef3=st.columns(3)
+                with ef1: e_invno=st.text_input("Invoice No",value=doc["id"])
+                with ef2: e_date=st.date_input("Date",value=datetime.strptime(doc["date"],"%Y-%m-%d").date())
+                with ef3: e_due=st.date_input("Due Date",value=datetime.strptime(doc["due"],"%Y-%m-%d").date() if doc.get("due") else date.today())
+                ef4,ef5=st.columns(2)
+                with ef4:
+                    stat_opts=["draft","sent","paid","overdue","cancelled"]
+                    e_status=st.selectbox("Status",stat_opts,index=stat_opts.index(doc["status"]) if doc["status"] in stat_opts else 0)
+                with ef5:
+                    e_tax=st.number_input("Tax %",min_value=0.0,max_value=100.0,value=float(doc.get("tax_rate",0)),step=0.5)
+                st.markdown("**Items**")
+                existing_items=doc.get("items",[]) or []
+                n_er=st.session_state.get(f"n_edit_detail_{doc['id']}",max(1,len(existing_items)))
+                edit_line_items=[]
+                for i in range(n_er):
+                    er1,er2,er3,er4=st.columns([3,1,1,1])
+                    prev_name=existing_items[i]["name"] if i<len(existing_items) else "—"
+                    prev_qty=existing_items[i]["qty"] if i<len(existing_items) else 1
+                    prev_price=existing_items[i]["price"] if i<len(existing_items) else 0
+                    item_opts=["—"]+inames
+                    pidx=item_opts.index(prev_name) if prev_name in item_opts else 0
+                    with er1: e_iname=st.selectbox(f"Item {i+1}",item_opts,index=pidx,key=f"dein_{doc['id']}_{i}")
+                    with er2: e_qty=st.number_input("Qty",min_value=1,value=int(prev_qty),key=f"deq_{doc['id']}_{i}")
+                    with er3:
+                        dp=iprices.get(e_iname,0) if e_iname!="—" else int(prev_price)
+                        e_price=st.number_input("Price",min_value=0,value=int(dp),key=f"dep_{doc['id']}_{i}")
+                    with er4: st.markdown(f"<div style='padding-top:26px;font-weight:700;color:#4F46E5;font-size:13px'>₹{e_qty*e_price:,}</div>",unsafe_allow_html=True)
+                    if e_iname!="—": edit_line_items.append({"name":e_iname,"qty":e_qty,"price":e_price,"amount":e_qty*e_price})
+                e_sub=sum(x["amount"] for x in edit_line_items); e_tax_amt=int(e_sub*e_tax/100); e_total=e_sub+e_tax_amt
+                st.markdown(f'<div style="background:#f8f9fa;border-radius:8px;padding:9px 14px;margin:8px 0;text-align:right"><b style="font-size:15px;color:#4F46E5">Total: ₹{e_total:,}</b></div>',unsafe_allow_html=True)
+                sb1,sb2,sb3=st.columns([2,1,1])
+                with sb1: do_esave=st.form_submit_button("💾 Save Changes",type="primary",use_container_width=True)
+                with sb2: do_erow=st.form_submit_button("➕ Row",use_container_width=True)
+                with sb3: do_ecanc=st.form_submit_button("✕ Cancel",use_container_width=True)
+                if do_esave:
+                    ec=st.session_state.get(ek_name,"").strip() or doc["customer"]
+                    ph2=st.session_state.get(ek_phone,""); ad2=st.session_state.get(ek_addr,""); em2=st.session_state.get(ek_email,"")
+                    # update customer
+                    found=False
+                    for ci,cc in enumerate(st.session_state.customers):
+                        if (cc["name"] if isinstance(cc,dict) else cc)==ec:
+                            st.session_state.customers[ci]={"name":ec,"email":em2,"phone":ph2,"address":ad2}; found=True; break
+                    if not found and ec: st.session_state.customers.append({"name":ec,"email":em2,"phone":ph2,"address":ad2})
+                    old_id=doc["id"]
+                    for idx,inv in enumerate(st.session_state.invoices):
+                        if inv["id"]==old_id:
+                            st.session_state.invoices[idx].update({"id":e_invno,"customer":ec,"date":str(e_date),"due":str(e_due),"status":e_status,"items":edit_line_items,"subtotal":e_sub,"tax":e_tax_amt,"tax_rate":e_tax,"amount":e_total}); break
+                    updated={**doc,"id":e_invno,"customer":ec,"date":str(e_date),"due":str(e_due),"status":e_status,"items":edit_line_items,"subtotal":e_sub,"tax":e_tax_amt,"tax_rate":e_tax,"amount":e_total}
+                    st.session_state.selected_inv=updated
+                    for k in [ek_name,ek_phone,ek_addr,ek_email,f"n_edit_detail_{doc['id']}"]: st.session_state.pop(k,None)
+                    st.session_state.inv_action="preview"; st.success("✅ Updated!"); st.rerun()
+                if do_erow: st.session_state[f"n_edit_detail_{doc['id']}"]=n_er+1; st.rerun()
+                if do_ecanc:
+                    for k in [ek_name,ek_phone,ek_addr,ek_email]: st.session_state.pop(k,None)
+                    st.session_state.inv_action="preview"; st.rerun()
 
         elif action=="send":
             st.markdown(f"### 📤 Send {cfg['doc_label']}")
