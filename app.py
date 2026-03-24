@@ -202,9 +202,6 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 DOC_CFG={
     "invoice":  {"label":"Invoices",       "icon":"📄","prefix":"AP",  "doc_label":"Invoice",       "tab_label":"Invoice"},
-    "estimate": {"label":"Estimates",      "icon":"📋","prefix":"EST", "doc_label":"Estimate",      "tab_label":"Estimate"},
-    "credit":   {"label":"Credit Notes",   "icon":"💳","prefix":"CN",  "doc_label":"Credit Note",   "tab_label":"Credit"},
-    "delivery": {"label":"Delivery Notes", "icon":"🚚","prefix":"DN",  "doc_label":"Delivery Note", "tab_label":"Delivery"},
     "purchase": {"label":"Purchase Orders","icon":"🛒","prefix":"PO",  "doc_label":"Purchase Order","tab_label":"Purchase"},
 }
 
@@ -213,19 +210,22 @@ with st.sidebar:
     s=st.session_state.settings
     lb=s.get("logo_b64")
     if lb:
-        st.markdown(f'<div style="padding:16px 14px 4px"><img src="data:image/png;base64,{lb}" style="width:46px;height:46px;border-radius:9px;object-fit:cover;"></div>',unsafe_allow_html=True)
-    st.markdown(f"""<div style="padding:{'5px' if lb else '18px'} 14px 14px">
-      <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
-        {'' if lb else '<div style="width:34px;height:34px;border-radius:8px;background:#4F46E5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-weight:800;font-size:11px">AP</span></div>'}
-        <div><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div>
-        <div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div></div>""",unsafe_allow_html=True)
+        st.markdown(f'<div style="padding:16px 14px 8px;text-align:center"><img src="data:image/png;base64,{lb}" style="max-width:150px;max-height:70px;object-fit:contain;border-radius:8px;"></div>',unsafe_allow_html=True)
+        st.markdown(f"""<div style="padding:4px 14px 14px;text-align:center">
+          <div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div>
+          <div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div>""",unsafe_allow_html=True)
+    else:
+        st.markdown(f"""<div style="padding:18px 14px 14px">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
+            <div style="width:34px;height:34px;border-radius:8px;background:#4F46E5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-weight:800;font-size:11px">AP</span></div>
+            <div><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div>
+            <div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div></div>""",unsafe_allow_html=True)
 
     cur=st.session_state.page
     st.markdown(f'<style>[data-testid="stSidebar"] [data-testid="stButton-sb_{cur}"]>button{{background:#EEF2FF!important;color:#4F46E5!important;font-weight:600!important;}}</style>',unsafe_allow_html=True)
 
     st.markdown('<div style="padding:0 10px;margin-bottom:3px;font-size:10px;font-weight:600;color:#9CA3AF;letter-spacing:1px">DOCUMENTS</div>',unsafe_allow_html=True)
-    for pid,icon,lbl in [("home","🏠","Home"),("invoice","📄","Invoice"),("estimate","📋","Estimates"),
-                          ("credit","💳","Credit Notes"),("delivery","🚚","Delivery Notes"),("purchase","🛒","Purchase Orders")]:
+    for pid,icon,lbl in [("home","🏠","Home"),("invoice","📄","Invoice"),("purchase","🛒","Purchase Orders")]:
         if st.button(f"{icon}  {lbl}",key=f"sb_{pid}",use_container_width=True): nav(pid)
 
     st.markdown('<div style="padding:0 10px;margin:10px 0 3px;font-size:10px;font-weight:600;color:#9CA3AF;letter-spacing:1px">MANAGE</div>',unsafe_allow_html=True)
@@ -259,9 +259,8 @@ def page_home():
 
     st.markdown("<div class='div'></div>",unsafe_allow_html=True)
     st.markdown('<p style="font-size:11px;font-weight:600;color:#9CA3AF;letter-spacing:1px;margin-bottom:8px">QUICK ACTIONS</p>',unsafe_allow_html=True)
-    qa=st.columns(6)
-    labels=[("invoice","📄","Invoice"),("estimate","📋","Estimate"),("credit","💳","Credit"),
-            ("delivery","🚚","Delivery"),("purchase","🛒","Purchase"),("cashflow","📊","Cash Flow")]
+    qa=st.columns(3)
+    labels=[("invoice","📄","Invoice"),("purchase","🛒","Purchase"),("cashflow","📊","Cash Flow")]
     for col,(pid,icon,lbl) in zip(qa,labels):
         with col:
             if st.button(f"{icon}\n\n{lbl}",key=f"qa_{pid}",use_container_width=True):
@@ -492,7 +491,7 @@ def page_documents(dtype):
                     "draft":("#F3F4F6","#6B7280"),"read":("#FEF9C3","#854D0E"),"cancelled":("#FEE2E2","#991B1B")}
                 for doc in fl:
                     bg2,fg2=bm.get(doc["status"],("#F3F4F6","#6B7280"))
-                    lc1,lc2,lc3,lc4,lc5=st.columns([3,1,1,1,1])
+                    lc1,lc2,lc3,lc4,lc5,lc6,lc7=st.columns([3,1,1,1,1,1,1])
                     with lc1: st.markdown(f'<div style="padding:5px 0"><div style="font-weight:600;font-size:14px">{doc["customer"]}</div><div style="font-size:11px;color:#9CA3AF">{doc["id"]} • {fd(doc["date"])}</div></div>',unsafe_allow_html=True)
                     with lc2: st.markdown(f'<div style="padding:5px 0;text-align:right"><div style="font-weight:700;font-size:13px">₹{doc["amount"]:,.0f}</div><span style="background:{bg2};color:{fg2};padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600">{doc["status"].title()}</span></div>',unsafe_allow_html=True)
                     with lc3:
@@ -504,6 +503,80 @@ def page_documents(dtype):
                     with lc5:
                         if st.button("💰",key=f"pay_{dtype}_{flt}_{doc['id']}",use_container_width=True):
                             st.session_state.selected_inv=doc; st.session_state.inv_action="pay"; st.rerun()
+                    with lc6:
+                        if st.button("✏️",key=f"edit_{dtype}_{flt}_{doc['id']}",use_container_width=True):
+                            st.session_state[f"editing_doc_{dtype}"]=doc["id"]; st.rerun()
+                    with lc7:
+                        if st.button("🗑️",key=f"del_{dtype}_{flt}_{doc['id']}",use_container_width=True):
+                            st.session_state[f"confirm_del_{dtype}"]=doc["id"]; st.rerun()
+                    # Delete confirmation
+                    if st.session_state.get(f"confirm_del_{dtype}")==doc["id"]:
+                        st.warning(f"⚠️ Delete **{doc['id']}** ({doc['customer']})? This cannot be undone.")
+                        dc1,dc2=st.columns(2)
+                        with dc1:
+                            if st.button("✅ Yes, Delete",key=f"yes_del_{doc['id']}",type="primary",use_container_width=True):
+                                st.session_state.invoices=[i for i in st.session_state.invoices if i["id"]!=doc["id"]]
+                                st.session_state.pop(f"confirm_del_{dtype}",None); st.rerun()
+                        with dc2:
+                            if st.button("← Cancel",key=f"no_del_{doc['id']}",use_container_width=True):
+                                st.session_state.pop(f"confirm_del_{dtype}",None); st.rerun()
+                    # Edit form inline
+                    if st.session_state.get(f"editing_doc_{dtype}")==doc["id"]:
+                        st.markdown("---")
+                        cust_names=[c["name"] if isinstance(c,dict) else c for c in st.session_state.customers]
+                        inames=[i["name"] for i in st.session_state.items_db]
+                        iprices={i["name"]:i["price"] for i in st.session_state.items_db}
+                        with st.form(f"edit_form_{doc['id']}"):
+                            st.markdown(f"**✏️ Edit {cfg['doc_label']} — {doc['id']}**")
+                            ef1,ef2,ef3=st.columns(3)
+                            with ef1:
+                                cust_idx=cust_names.index(doc["customer"]) if doc["customer"] in cust_names else 0
+                                e_cust=st.selectbox("Customer *",cust_names,index=cust_idx,key=f"ecust_{doc['id']}")
+                            with ef2:
+                                e_date=st.date_input("Date",value=datetime.strptime(doc["date"],"%Y-%m-%d").date(),key=f"edate_{doc['id']}")
+                            with ef3:
+                                e_due=st.date_input("Due Date",value=datetime.strptime(doc["due"],"%Y-%m-%d").date() if doc.get("due") else date.today(),key=f"edue_{doc['id']}")
+                            ef4,ef5=st.columns(2)
+                            with ef4:
+                                stat_opts=["draft","sent","paid","overdue","cancelled"]
+                                e_status=st.selectbox("Status",stat_opts,index=stat_opts.index(doc["status"]) if doc["status"] in stat_opts else 0,key=f"estat_{doc['id']}")
+                            with ef5:
+                                e_tax=st.number_input("Tax %",min_value=0.0,max_value=100.0,value=float(doc.get("tax_rate",0)),step=0.5,key=f"etax_{doc['id']}")
+                            st.markdown("**Items**")
+                            existing_items=doc.get("items",[]) or []
+                            n_edit_rows=st.session_state.get(f"n_edit_rows_{doc['id']}",max(1,len(existing_items)))
+                            edit_line_items=[]
+                            for i in range(n_edit_rows):
+                                er1,er2,er3,er4=st.columns([3,1,1,1])
+                                prev_name=existing_items[i]["name"] if i<len(existing_items) else "—"
+                                prev_qty=existing_items[i]["qty"] if i<len(existing_items) else 1
+                                prev_price=existing_items[i]["price"] if i<len(existing_items) else 0
+                                item_opts=["—"]+inames
+                                prev_idx=item_opts.index(prev_name) if prev_name in item_opts else 0
+                                with er1: e_iname=st.selectbox(f"Item {i+1}",item_opts,index=prev_idx,key=f"ein_{doc['id']}_{i}")
+                                with er2: e_qty=st.number_input("Qty",min_value=1,value=int(prev_qty),key=f"eq_{doc['id']}_{i}")
+                                with er3:
+                                    dp=iprices.get(e_iname,0) if e_iname!="—" else prev_price
+                                    e_price=st.number_input("Price",min_value=0,value=int(dp),key=f"ep_{doc['id']}_{i}")
+                                with er4:
+                                    st.markdown(f"<div style='padding-top:26px;font-weight:700;color:#4F46E5;font-size:13px'>₹{e_qty*e_price:,}</div>",unsafe_allow_html=True)
+                                if e_iname!="—": edit_line_items.append({"name":e_iname,"qty":e_qty,"price":e_price,"amount":e_qty*e_price})
+                            e_sub=sum(x["amount"] for x in edit_line_items)
+                            e_tax_amt=int(e_sub*e_tax/100); e_total=e_sub+e_tax_amt
+                            st.markdown(f'<div style="background:#f8f9fa;border-radius:8px;padding:9px 14px;margin:8px 0;text-align:right;font-size:13px"><b style="font-size:15px;color:#4F46E5">Total: ₹{e_total:,}</b></div>',unsafe_allow_html=True)
+                            eb1,eb2,eb3=st.columns([2,1,1])
+                            with eb1: do_esave=st.form_submit_button("💾 Save Changes",type="primary",use_container_width=True)
+                            with eb2: do_erow=st.form_submit_button("➕ Row",use_container_width=True)
+                            with eb3: do_ecanc=st.form_submit_button("✕ Cancel",use_container_width=True)
+                            if do_esave:
+                                for idx,inv in enumerate(st.session_state.invoices):
+                                    if inv["id"]==doc["id"]:
+                                        st.session_state.invoices[idx].update({"customer":e_cust,"date":str(e_date),"due":str(e_due),"status":e_status,"items":edit_line_items,"subtotal":e_sub,"tax":e_tax_amt,"tax_rate":e_tax,"amount":e_total})
+                                        break
+                                st.session_state.pop(f"editing_doc_{dtype}",None); st.success("✅ Updated!"); st.rerun()
+                            if do_erow: st.session_state[f"n_edit_rows_{doc['id']}"]=n_edit_rows+1; st.rerun()
+                            if do_ecanc: st.session_state.pop(f"editing_doc_{dtype}",None); st.rerun()
+                        st.markdown("---")
                     st.markdown("<hr style='margin:3px 0;border-color:#F3F4F6'>",unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════
@@ -724,9 +797,6 @@ def page_settings():
 pg=st.session_state.page
 if pg=="home":         page_home()
 elif pg=="invoice":    page_documents("invoice")
-elif pg=="estimate":   page_documents("estimate")
-elif pg=="credit":     page_documents("credit")
-elif pg=="delivery":   page_documents("delivery")
 elif pg=="purchase":   page_documents("purchase")
 elif pg=="cashflow":   page_cashflow()
 elif pg=="reports":    page_reports()
