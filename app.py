@@ -203,6 +203,11 @@ def init():
     }
     for k,v in D.items():
         if k not in st.session_state: st.session_state[k]=v
+    # Patch any missing settings keys (for existing sessions)
+    default_settings=D["settings"]
+    for sk,sv in default_settings.items():
+        if sk not in st.session_state.settings:
+            st.session_state.settings[sk]=sv
     st.session_state.customers=[
         {"name":c,"email":"","phone":"","address":""} if isinstance(c,str) else c
         for c in st.session_state.customers
@@ -230,7 +235,8 @@ with st.sidebar:
           <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
             <div style="width:34px;height:34px;border-radius:8px;background:#4F46E5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-weight:800;font-size:11px">AP</span></div>
             <div><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div>
-            <div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div></div>""",unsafe_allow_html=True)
+            <div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div>
+          <div style="font-size:10px;color:#C4B5FD;background:#EEF2FF;border-radius:6px;padding:5px 8px;margin-top:-8px;margin-bottom:4px">⬆️ Upload logo in Settings</div></div>""",unsafe_allow_html=True)
 
     cur=st.session_state.page
     st.markdown(f'<style>[data-testid="stSidebar"] [data-testid="stButton-sb_{cur}"]>button{{background:#EEF2FF!important;color:#4F46E5!important;font-weight:600!important;}}</style>',unsafe_allow_html=True)
@@ -489,7 +495,12 @@ def page_documents(dtype):
                 inv_date=st.date_input("Date",value=date.today(),key=f"idate_{dtype}")
 
             dc1,dc2,dc3=st.columns(3)
-            with dc1: due_date=st.date_input("Due Date",value=date.today()+timedelta(days=15),key=f"due_{dtype}")
+            with dc1:
+                due_toggle=st.toggle("Due Date",value=True,key=f"due_tog_{dtype}")
+                if due_toggle:
+                    due_date=st.date_input("",value=date.today()+timedelta(days=15),key=f"due_{dtype}",label_visibility="collapsed")
+                else:
+                    due_date=None
             with dc2: inv_status=st.selectbox("Status",["draft","sent","paid"],key=f"ist_{dtype}")
             with dc3: tax_rate=st.number_input("Tax %",min_value=0.0,max_value=100.0,value=float(s.get("tax_rate",0)),step=0.5,key=f"tax_{dtype}")
 
@@ -521,7 +532,7 @@ def page_documents(dtype):
 
             actual_cust=st.session_state.get(ck_name,"").strip()
             new_doc={"id":inv_no,"type":dtype,"customer":actual_cust,"date":str(inv_date),
-                     "due":str(due_date),"amount":total,"status":inv_status,
+                     "due":str(due_date) if due_date else "","amount":total,"status":inv_status,
                      "items":line_items,"subtotal":sub,"tax":tax_amt,"tax_rate":tax_rate}
 
             if do_save and actual_cust:
