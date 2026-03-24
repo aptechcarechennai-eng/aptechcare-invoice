@@ -406,28 +406,76 @@ def page_documents(dtype):
     if st.session_state.get("show_new_inv") and st.session_state.get("new_inv_type")==dtype:
         st.markdown("---")
         cust_names=[c["name"] if isinstance(c,dict) else c for c in st.session_state.customers]
+        cust_map={c["name"]:c for c in st.session_state.customers if isinstance(c,dict)}
         inames=[i["name"] for i in st.session_state.items_db]
         iprices={i["name"]:i["price"] for i in st.session_state.items_db}
 
+        st.markdown(f"**New {cfg['doc_label']}**")
+
+        # ── Customer search (OUTSIDE form for live suggestions) ──
+        ck_name=f"nc_name_{dtype}"; ck_phone=f"nc_phone_{dtype}"; ck_addr=f"nc_addr_{dtype}"; ck_email=f"nc_email_{dtype}"
+        if ck_name not in st.session_state: st.session_state[ck_name]=""
+        if ck_phone not in st.session_state: st.session_state[ck_phone]=""
+        if ck_addr not in st.session_state: st.session_state[ck_addr]=""
+        if ck_email not in st.session_state: st.session_state[ck_email]=""
+
+        st.markdown('<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Customer *</p>',unsafe_allow_html=True)
+        typed=st.text_input("Customer name",value=st.session_state[ck_name],
+                            placeholder="Type to search or add new customer...",
+                            label_visibility="collapsed",key=f"ctype_{dtype}")
+        if typed!=st.session_state[ck_name]:
+            st.session_state[ck_name]=typed
+            # auto-fill if exact match
+            if typed in cust_map:
+                c=cust_map[typed]
+                st.session_state[ck_phone]=c.get("phone","")
+                st.session_state[ck_addr]=c.get("address","")
+                st.session_state[ck_email]=c.get("email","")
+            else:
+                st.session_state[ck_phone]=""; st.session_state[ck_addr]=""; st.session_state[ck_email]=""
+            st.rerun()
+
+        # Show live suggestions
+        if typed and typed not in cust_map:
+            matches=[n for n in cust_names if typed.lower() in n.lower()]
+            if matches:
+                st.markdown('<p style="font-size:11px;color:#9CA3AF;margin:2px 0 4px">Suggestions:</p>',unsafe_allow_html=True)
+                scols=st.columns(min(len(matches),4))
+                for i,m in enumerate(matches[:4]):
+                    with scols[i]:
+                        if st.button(f"👤 {m}",key=f"sug_{dtype}_{i}",use_container_width=True):
+                            c=cust_map.get(m,{})
+                            st.session_state[ck_name]=m
+                            st.session_state[ck_phone]=c.get("phone","")
+                            st.session_state[ck_addr]=c.get("address","")
+                            st.session_state[ck_email]=c.get("email","")
+                            st.rerun()
+            else:
+                st.markdown(f'<p style="font-size:11px;color:#4F46E5;margin:2px 0">✨ New customer will be created: <b>{typed}</b></p>',unsafe_allow_html=True)
+        elif typed and typed in cust_map:
+            st.markdown(f'<p style="font-size:11px;color:#10B981;margin:2px 0">✅ Existing customer selected</p>',unsafe_allow_html=True)
+
+        # Customer details (phone, address, email) — always shown & editable
+        cd1,cd2,cd3=st.columns(3)
+        with cd1:
+            ph_val=st.text_input("📞 Phone",value=st.session_state[ck_phone],key=f"cph_{dtype}",placeholder="Phone number")
+            if ph_val!=st.session_state[ck_phone]: st.session_state[ck_phone]=ph_val
+        with cd2:
+            ad_val=st.text_input("📍 Address",value=st.session_state[ck_addr],key=f"cad_{dtype}",placeholder="Address")
+            if ad_val!=st.session_state[ck_addr]: st.session_state[ck_addr]=ad_val
+        with cd3:
+            em_val=st.text_input("✉️ Email",value=st.session_state[ck_email],key=f"cem_{dtype}",placeholder="Email (optional)")
+            if em_val!=st.session_state[ck_email]: st.session_state[ck_email]=em_val
+
+        st.markdown("<div style='height:6px'></div>",unsafe_allow_html=True)
+
         with st.form(f"nif_{dtype}"):
-            st.markdown(f"**New {cfg['doc_label']}**")
-            fc1,fc2,fc3=st.columns(3)
+            fc1,fc2=st.columns(2)
             with fc1:
-                # Customer: selectbox with existing + type new
-                cust_opt=cust_names+["+ New Customer"]
-                customer_sel=st.selectbox("Customer *",cust_opt,key=f"csel_{dtype}")
-            with fc2:
                 n=s.get("next_invoice_no",1001)
                 inv_no=st.text_input("Doc #",value=f"{cfg['prefix']}-{n}",key=f"ino_{dtype}")
-            with fc3:
+            with fc2:
                 inv_date=st.date_input("Date",value=date.today(),key=f"idate_{dtype}")
-
-            if customer_sel=="+ New Customer":
-                nc1,nc2=st.columns(2)
-                with nc1: new_cust_name=st.text_input("New Customer Name *",key=f"ncn_{dtype}")
-                with nc2: new_cust_phone=st.text_input("Phone",key=f"ncp_{dtype}")
-            else:
-                new_cust_name=""; new_cust_phone=""
 
             dc1,dc2,dc3=st.columns(3)
             with dc1: due_date=st.date_input("Due Date",value=date.today()+timedelta(days=15),key=f"due_{dtype}")
@@ -460,22 +508,32 @@ def page_documents(dtype):
             with bc3: do_prev=st.form_submit_button("👁 Preview",use_container_width=True)
             with bc4: do_canc=st.form_submit_button("✕ Cancel",use_container_width=True)
 
-            actual_cust=new_cust_name if customer_sel=="+ New Customer" else customer_sel
+            actual_cust=st.session_state.get(ck_name,"").strip()
             new_doc={"id":inv_no,"type":dtype,"customer":actual_cust,"date":str(inv_date),
                      "due":str(due_date),"amount":total,"status":inv_status,
                      "items":line_items,"subtotal":sub,"tax":tax_amt,"tax_rate":tax_rate}
 
             if do_save and actual_cust:
-                if customer_sel=="+ New Customer" and new_cust_name:
-                    st.session_state.customers.append({"name":new_cust_name,"email":"","phone":new_cust_phone,"address":""})
+                # Save or update customer
+                ph=st.session_state.get(ck_phone,""); ad=st.session_state.get(ck_addr,""); em=st.session_state.get(ck_email,"")
+                if actual_cust not in [c["name"] if isinstance(c,dict) else c for c in st.session_state.customers]:
+                    st.session_state.customers.append({"name":actual_cust,"email":em,"phone":ph,"address":ad})
+                else:
+                    for ci,cc in enumerate(st.session_state.customers):
+                        if (cc["name"] if isinstance(cc,dict) else cc)==actual_cust:
+                            st.session_state.customers[ci]={"name":actual_cust,"email":em,"phone":ph,"address":ad}; break
                 st.session_state.invoices.insert(0,new_doc)
                 s["next_invoice_no"]=s.get("next_invoice_no",1001)+1
                 st.session_state.show_new_inv=False; st.session_state.n_rows=1
+                for k in [ck_name,ck_phone,ck_addr,ck_email]: st.session_state.pop(k,None)
                 st.success(f"✅ {inv_no} saved!"); st.rerun()
             if do_row: st.session_state.n_rows=n_rows+1; st.rerun()
             if do_prev and actual_cust:
                 st.session_state.selected_inv=new_doc; st.session_state.inv_action="preview"; st.rerun()
-            if do_canc: st.session_state.show_new_inv=False; st.session_state.n_rows=1; st.rerun()
+            if do_canc:
+                st.session_state.show_new_inv=False; st.session_state.n_rows=1
+                for k in [ck_name,ck_phone,ck_addr,ck_email]: st.session_state.pop(k,None)
+                st.rerun()
 
     # ── Invoice list ─────────────────────────────────────────────
     tabs=st.tabs(["All","Draft","Sent","Paid","Overdue","Cancelled"])
