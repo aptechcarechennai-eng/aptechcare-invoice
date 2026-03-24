@@ -179,14 +179,14 @@ def init():
         {"name":"Network Setup",    "code":"NW004", "price":3500, "unit":"per job"},
       ],
       "settings":{
-        "company_name":"AP Tech Care","Smart Tech Solution","T.ArunPrasad.BE.MBA.","company_email":"aptechcare.chennai@gmail.com",
+        "company_name":"AP Tech Care","company_email":"aptechcare.chennai@gmail.com",
         "company_phone":"9940147658",
         "company_address1":"1/4A, Kamaraj Cross Street, Ambal Nagar, Ramapuram,",
         "company_address2":"Chennai, Tamilnadu 600 089",
         "gst_no":"","currency":"INR","date_format":"DD/MM/YYYY","tax_rate":0,
         "logo_b64":None,"next_invoice_no":1004,
         "accounts":["Cash","UPI / GPay","Bank Transfer"],
-        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName:ArunPrasad.T\nGpay No: 9940147658",
+        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad, BE., MBA.\nGpay No: 9940147658",
       },
       "transactions":[],
     }
@@ -295,7 +295,7 @@ def page_home():
         st.markdown(f'<div style="display:flex;justify-content:space-between;padding:8px 12px;background:#EEF2FF;border-radius:8px;margin-bottom:4px"><span style="font-size:13px">👥 Customers</span><span style="font-weight:700;color:#4F46E5">{len(st.session_state.customers)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 12px;background:#F0FDF4;border-radius:8px"><span style="font-size:13px">📦 Items</span><span style="font-weight:700;color:#166534">{len(st.session_state.items_db)}</span></div>',unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════
-# DOCUMENTS (Invoice )
+# DOCUMENTS (Invoice / Estimate / Credit / Delivery / Purchase)
 # ══════════════════════════════════════════════════════════════════
 def page_documents(dtype):
     cfg=DOC_CFG[dtype]
