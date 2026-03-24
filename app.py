@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime, date, timedelta
 import base64, urllib.parse
 
@@ -58,13 +59,24 @@ def inv_html(doc, s, doc_label="Invoice"):
         </tr>"""
     if not rows:
         rows=f'<tr><td colspan="3" style="padding:12px;text-align:right;color:#777">Total</td><td style="padding:12px;text-align:right;font-weight:700">Rs.{total:,.2f}</td></tr>'
-    tax_row=f'<tr><td class="l">Tax ({doc.get("tax_rate",0)}%)</td><td class="v">Rs.{tax:,.2f}</td></tr>' if tax>0 else ""
+    tax_row=""
+    if tax>0:
+        tax_row=f'<tr><td style="padding:6px 12px;font-size:13px;color:#555;text-align:left;border-bottom:1px solid #eee;">Tax ({doc.get("tax_rate",0)}%)</td><td style="padding:6px 12px;font-size:13px;text-align:right;font-weight:600;border-bottom:1px solid #eee;">Rs.{tax:,.2f}</td></tr>'
     caddr=""; cphone=""
     for c in st.session_state.customers:
         if isinstance(c,dict) and c.get("name")==doc.get("customer"):
             caddr=c.get("address",""); cphone=c.get("phone",""); break
     a2=s.get("company_address2","")
-    due_row=f'<tr><td style="padding:3px 8px;color:#555">Due</td><td style="padding:3px 8px;font-weight:700;text-align:right">{fd(doc["due"])}</td></tr>' if doc.get("due") else ""
+    tagline=s.get("company_tagline","Smart Tech Solutions")
+    owner=s.get("owner_name","")
+    due_row=""
+    if doc.get("due"):
+        due_row=f'<tr><td style="padding:3px 8px;color:#555">Due</td><td style="padding:3px 8px;font-weight:700;text-align:right">{fd(doc["due"])}</td></tr>'
+    # build tots table safely (no nested f-string)
+    tots_rows = f'<tr><td style="padding:6px 12px;font-size:13px;color:#555;text-align:left;border-bottom:1px solid #eee;">Subtotal</td><td style="padding:6px 12px;font-size:13px;text-align:right;font-weight:600;border-bottom:1px solid #eee;">Rs.{sub:,.2f}</td></tr>'
+    tots_rows += tax_row
+    tots_rows += f'<tr><td style="padding:6px 12px;font-size:13px;color:#555;text-align:left;border-bottom:1px solid #eee;">Total</td><td style="padding:6px 12px;font-size:13px;text-align:right;font-weight:600;border-bottom:1px solid #eee;">Rs.{total:,.2f}</td></tr>'
+    owner_line = f'<div class="co-owner">{owner}</div>' if owner else ""
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{doc["id"]}</title>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box;}}
@@ -73,8 +85,10 @@ body{{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1a1a1a;paddin
 .hdr{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #e5e7eb;}}
 .logo-box{{min-width:160px;}}
 .co-right{{text-align:right;}}
-.inv-title{{font-size:34px;font-weight:900;color:#1a1a1a;line-height:1;margin-bottom:6px;}}
-.co-name{{font-size:15px;font-weight:700;margin-bottom:3px;}}
+.inv-title{{font-size:34px;font-weight:900;color:#1a1a1a;line-height:1;margin-bottom:8px;}}
+.co-name{{font-size:16px;font-weight:800;color:#1a1a1a;margin-bottom:2px;}}
+.co-tagline{{font-size:12px;font-weight:600;color:#4F46E5;margin-bottom:3px;letter-spacing:.3px;}}
+.co-owner{{font-size:12px;font-weight:600;color:#374151;margin-bottom:3px;}}
 .co-info{{font-size:12px;color:#555;line-height:1.7;}}
 .mid{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding:14px 16px;border:1px solid #e5e7eb;border-radius:4px;}}
 .bill-to h4{{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}}
@@ -95,9 +109,6 @@ table.items tbody tr:nth-child(even){{background:#fafafa;}}
 .pi p{{font-size:12px;color:#444;line-height:1.8;}}
 .tots{{min-width:230px;}}
 .tots table{{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;}}
-.tots td{{padding:6px 12px;font-size:13px;}}
-.l{{color:#555;text-align:left;border-bottom:1px solid #eee;}}
-.v{{text-align:right;font-weight:600;border-bottom:1px solid #eee;}}
 .amt-box{{border:1px solid #e5e7eb;border-top:none;padding:14px 12px;text-align:center;}}
 .amt-label{{font-size:12px;color:#777;margin-bottom:4px;}}
 .amt-val{{font-size:24px;font-weight:900;color:#1a1a1a;}}
@@ -109,9 +120,11 @@ table.items tbody tr:nth-child(even){{background:#fafafa;}}
   <div class="co-right">
     <div class="inv-title">{doc_label}</div>
     <div class="co-name">{s.get("company_name","AP Tech Care")}</div>
+    <div class="co-tagline">{tagline}</div>
+    {owner_line}
     <div class="co-info">
       {s.get("company_address1","")}<br>
-      {a2+("<br>" if a2 else "")}{s.get("company_phone","")}<br>
+      {(a2+"<br>") if a2 else ""}{s.get("company_phone","")}<br>
       {s.get("company_email","")}
     </div>
   </div>
@@ -140,11 +153,7 @@ table.items tbody tr:nth-child(even){{background:#fafafa;}}
     <p>{s.get("payment_instructions","").replace(chr(10),"<br>")}</p>
   </div>
   <div class="tots">
-    <table>
-      <tr><td class="l">Subtotal</td><td class="v">Rs.{sub:,.2f}</td></tr>
-      {tax_row}
-      <tr><td class="l">Total</td><td class="v">Rs.{total:,.2f}</td></tr>
-    </table>
+    <table>{tots_rows}</table>
     <div class="amt-box">
       <div class="amt-label">Amount due</div>
       <div class="amt-val">Rs.{total:,.2f}</div>
@@ -183,10 +192,12 @@ def init():
         "company_phone":"9940147658",
         "company_address1":"1/4A, Kamaraj Cross Street, Ambal Nagar, Ramapuram,",
         "company_address2":"Chennai, Tamilnadu 600 089",
+        "company_tagline":"Smart Tech Solutions",
+        "owner_name":"T.Arunprasad, BE., MBA.,",
         "gst_no":"","currency":"INR","date_format":"DD/MM/YYYY","tax_rate":0,
         "logo_b64":None,"next_invoice_no":1004,
         "accounts":["Cash","UPI / GPay","Bank Transfer"],
-        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad\nGpay No: 9940147658",
+        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad, BE., MBA.\nGpay No: 9940147658",
       },
       "transactions":[],
     }
@@ -336,7 +347,7 @@ def page_documents(dtype):
         html=inv_html(doc,s,cfg["doc_label"])
 
         if action=="preview":
-            st.markdown(html,unsafe_allow_html=True)
+            components.html(html, height=900, scrolling=True)
 
         elif action=="send":
             st.markdown(f"### 📤 Send {cfg['doc_label']}")
@@ -818,6 +829,8 @@ def page_settings():
         c1,c2=st.columns(2)
         with c1:
             sn=st.text_input("Company Name",value=s.get("company_name",""))
+            st_line=st.text_input("Tagline",value=s.get("company_tagline","Smart Tech Solutions"))
+            sown=st.text_input("Owner Name",value=s.get("owner_name",""))
             sp=st.text_input("Phone",value=s.get("company_phone",""))
             sa1=st.text_input("Address Line 1",value=s.get("company_address1",""))
             sa2=st.text_input("Address Line 2",value=s.get("company_address2",""))
@@ -825,7 +838,7 @@ def page_settings():
             se=st.text_input("Email",value=s.get("company_email",""))
             sg=st.text_input("GST No",value=s.get("gst_no",""))
         if st.button("💾 Save Company",type="primary"):
-            s.update({"company_name":sn,"company_phone":sp,"company_email":se,"gst_no":sg,"company_address1":sa1,"company_address2":sa2})
+            s.update({"company_name":sn,"company_tagline":st_line,"owner_name":sown,"company_phone":sp,"company_email":se,"gst_no":sg,"company_address1":sa1,"company_address2":sa2})
             st.success("✅ Saved!"); st.rerun()
 
     elif sec=="💳 Payment":
