@@ -29,6 +29,28 @@ section[data-testid="stSidebar"]{min-width:215px!important;width:215px!important
 .stTabs [aria-selected="true"]{color:#4F46E5!important;border-bottom:2px solid #4F46E5!important;font-weight:600!important;}
 .stTextInput input,.stTextArea textarea,.stDateInput input,.stNumberInput input{border:1px solid #E5E7EB!important;border-radius:7px!important;background:#fff!important;color:#111!important;font-size:13px!important;}
 .stSelectbox>div>div{border:1px solid #E5E7EB!important;border-radius:7px!important;font-size:13px!important;}
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+  section[data-testid="stSidebar"]{min-width:0!important;width:0!important;transform:translateX(-215px)!important;}
+  .block-container{padding:0.8rem 0.7rem 1.5rem!important;}
+  [data-testid="metric-container"]{padding:10px 8px!important;}
+  [data-testid="metric-container"] [data-testid="stMetricValue"]{font-size:15px!important;}
+  .pt{font-size:16px!important;}
+  /* Stack columns on mobile */
+  [data-testid="column"]{min-width:100%!important;width:100%!important;}
+  /* Smaller buttons */
+  .stButton>button{font-size:11px!important;padding:5px 6px!important;}
+  /* Invoice list wrap */
+  .inv-row-wrap{flex-direction:column!important;}
+  /* Tabs scroll */
+  .stTabs [data-baseweb="tab-list"]{overflow-x:auto!important;flex-wrap:nowrap!important;}
+  .stTabs [data-baseweb="tab"]{font-size:11px!important;padding:6px 10px!important;white-space:nowrap!important;}
+}
+@media (max-width: 480px) {
+  .block-container{padding:0.5rem 0.4rem 1rem!important;}
+  [data-testid="metric-container"] [data-testid="stMetricValue"]{font-size:13px!important;}
+}
 </style>"""
 
 # ── SUPABASE ──────────────────────────────────────────────────────
@@ -44,17 +66,30 @@ def get_sb():
             pass
     return None
 
-def db_save_settings(s):
+# ── Save ALL app data to Supabase ─────────────────────────────────
+def db_save_all():
+    """Save invoices, customers, items_db, settings, transactions to Supabase."""
     try:
         sb = get_sb()
         if sb:
-            sb.table("ap_settings").upsert({"id": 1, "data": json.dumps(s)}).execute()
+            payload = {
+                "id": 1,
+                "data": json.dumps({
+                    "settings":     st.session_state.settings,
+                    "invoices":     st.session_state.invoices,
+                    "customers":    st.session_state.customers,
+                    "items_db":     st.session_state.items_db,
+                    "transactions": st.session_state.transactions,
+                })
+            }
+            sb.table("ap_settings").upsert(payload).execute()
             return True
     except Exception as e:
-        pass
+        st.toast(f"Cloud save error: {e}", icon="⚠️")
     return False
 
-def db_load_settings():
+def db_load_all():
+    """Load all app data from Supabase."""
     try:
         sb = get_sb()
         if sb:
@@ -226,7 +261,7 @@ def init():
             "payment_instructions": "Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad, BE., MBA.\nGpay No: 9940147658",
         },
         "transactions": [],
-        "settings_loaded": False,
+        "data_loaded": False,   # ← renamed from settings_loaded
     }
     for k, v in D.items():
         if k not in st.session_state:
@@ -243,14 +278,32 @@ def init():
         for c in st.session_state.customers
     ]
 
-    # Load settings from Supabase (only once per session)
-    if not st.session_state.settings_loaded:
-        loaded = db_load_settings()
+    # ── Load ALL data from Supabase (only once per session) ──────
+    if not st.session_state.data_loaded:
+        loaded = db_load_all()
         if loaded:
-            for k, v in loaded.items():
-                st.session_state.settings[k] = v
-            st.toast("✅ Settings loaded from cloud!", icon="☁️")
-        st.session_state.settings_loaded = True
+            # Settings
+            if "settings" in loaded:
+                for k, v in loaded["settings"].items():
+                    st.session_state.settings[k] = v
+            # Invoices
+            if "invoices" in loaded and loaded["invoices"]:
+                st.session_state.invoices = loaded["invoices"]
+            # Customers
+            if "customers" in loaded and loaded["customers"]:
+                raw = loaded["customers"]
+                st.session_state.customers = [
+                    {"name": c, "email": "", "phone": "", "address": ""} if isinstance(c, str) else c
+                    for c in raw
+                ]
+            # Items
+            if "items_db" in loaded and loaded["items_db"]:
+                st.session_state.items_db = loaded["items_db"]
+            # Transactions
+            if "transactions" in loaded and loaded["transactions"]:
+                st.session_state.transactions = loaded["transactions"]
+            st.toast("☁️ Data loaded from cloud!", icon="✅")
+        st.session_state.data_loaded = True
 
 init()
 st.markdown(CSS, unsafe_allow_html=True)
@@ -268,7 +321,7 @@ with st.sidebar:
         st.markdown(f'<div style="padding:16px 14px 8px;text-align:center"><img src="data:image/png;base64,{lb}" style="max-width:150px;max-height:70px;object-fit:contain;border-radius:8px;"></div>', unsafe_allow_html=True)
         st.markdown(f'<div style="padding:4px 14px 14px;text-align:center"><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div><div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div>', unsafe_allow_html=True)
     else:
-        st.markdown(f'<div style="padding:18px 14px 14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:18px"><div style="width:34px;height:34px;border-radius:8px;background:#4F46E5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-weight:800;font-size:11px">AP</span></div><div><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div><div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div><div style="font-size:10px;color:#C4B5FD;background:#EEF2FF;border-radius:6px;padding:5px 8px;margin-top:-8px;margin-bottom:4px">Upload logo in Settings</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="padding:18px 14px 14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:18px"><div style="width:34px;height:34px;border-radius:8px;background:#4F46E5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-weight:800;font-size:11px">AP</span></div><div><div style="font-weight:700;font-size:13px;color:#111">{s.get("company_name","AP Tech Care")}</div><div style="font-size:10px;color:#9CA3AF">Smart Tech Solutions</div></div></div></div>', unsafe_allow_html=True)
 
     cur = st.session_state.page
     st.markdown(f'<style>[data-testid="stSidebar"] [data-testid="stButton-sb_{cur}"]>button{{background:#EEF2FF!important;color:#4F46E5!important;font-weight:600!important;}}</style>', unsafe_allow_html=True)
@@ -460,7 +513,8 @@ def page_documents(dtype):
                     updated={**doc,"id":e_invno,"customer":ec,"date":str(e_date),"due":str(e_due),"status":e_status,"items":edit_line_items,"subtotal":e_sub,"tax":e_tax_amt,"tax_rate":e_tax,"amount":e_total}
                     st.session_state.selected_inv=updated
                     for k in [ek_name,ek_phone,ek_addr,ek_email,f"n_edit_detail_{doc['id']}"]: st.session_state.pop(k,None)
-                    st.session_state.inv_action="preview"; st.success("Updated!"); st.rerun()
+                    db_save_all()   # ← SAVE after edit
+                    st.session_state.inv_action="preview"; st.success("Updated & saved!"); st.rerun()
                 if do_erow: st.session_state[f"n_edit_detail_{doc['id']}"]=n_er+1; st.rerun()
                 if do_ecanc:
                     for k in [ek_name,ek_phone,ek_addr,ek_email]: st.session_state.pop(k,None)
@@ -495,7 +549,8 @@ def page_documents(dtype):
                             if inv["id"]==doc["id"]:
                                 st.session_state.invoices[idx].update({"status":"paid","paid_date":str(pd2),"pay_method":pm})
                                 st.session_state.selected_inv=st.session_state.invoices[idx]; break
-                        st.success("Marked as Paid!"); st.session_state.inv_action="preview"; st.rerun()
+                        db_save_all()   # ← SAVE after payment
+                        st.success("Marked as Paid & saved!"); st.session_state.inv_action="preview"; st.rerun()
                     if bk: st.session_state.inv_action="preview"; st.rerun()
 
         elif action=="cancel":
@@ -505,6 +560,7 @@ def page_documents(dtype):
                 if st.button("Yes, Cancel",type="primary",use_container_width=True):
                     for idx,inv in enumerate(st.session_state.invoices):
                         if inv["id"]==doc["id"]: st.session_state.invoices[idx]["status"]="cancelled"; break
+                    db_save_all()   # ← SAVE after cancel
                     st.session_state.selected_inv=None; st.session_state.inv_action=None; st.rerun()
             with cc2:
                 if st.button("Go Back",use_container_width=True): st.session_state.inv_action="preview"; st.rerun()
@@ -600,7 +656,8 @@ def page_documents(dtype):
                 s["next_invoice_no"]=s.get("next_invoice_no",1001)+1
                 st.session_state.show_new_inv=False; st.session_state.n_rows=1
                 for k in [ck_name,ck_phone,ck_addr,ck_email]: st.session_state.pop(k,None)
-                st.success(f"{inv_no} saved!"); st.rerun()
+                db_save_all()   # ← SAVE after new invoice
+                st.success(f"{inv_no} saved to cloud!"); st.rerun()
             if do_row: st.session_state.n_rows=n_rows+1; st.rerun()
             if do_prev and actual_cust:
                 st.session_state.selected_inv=new_doc; st.session_state.inv_action="preview"; st.rerun()
@@ -645,6 +702,7 @@ def page_documents(dtype):
                         with dc1:
                             if st.button("Yes Delete",key=f"yes_del_{doc['id']}",type="primary",use_container_width=True):
                                 st.session_state.invoices=[i for i in st.session_state.invoices if i["id"]!=doc["id"]]
+                                db_save_all()   # ← SAVE after delete
                                 st.session_state.pop(f"confirm_del_{dtype}",None); st.rerun()
                         with dc2:
                             if st.button("No",key=f"no_del_{doc['id']}",use_container_width=True):
@@ -679,7 +737,9 @@ def page_cashflow():
             with tc1: ttype=st.selectbox("Type",["Income","Expense"]); tamt=st.number_input("Amount",min_value=0)
             with tc2: tdesc=st.text_input("Description"); tacct=st.selectbox("Account",st.session_state.settings.get("accounts",["Cash"]))
             if st.form_submit_button("Add Transaction",type="primary"):
-                txns.append({"type":ttype,"amount":tamt,"desc":tdesc,"account":tacct}); st.rerun()
+                txns.append({"type":ttype,"amount":tamt,"desc":tdesc,"account":tacct})
+                db_save_all()   # ← SAVE transactions
+                st.rerun()
         for t in reversed(txns[-10:]):
             col2="#10B981" if t["type"]=="Income" else "#EF4444"; sgn="+" if t["type"]=="Income" else "-"
             st.markdown(f'<div style="display:flex;justify-content:space-between;padding:10px 14px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:5px"><div><b>{t["desc"]}</b><br><span style="font-size:11px;color:#9CA3AF">{t["account"]}</span></div><b style="color:{col2}">{sgn}Rs.{t["amount"]:,}</b></div>',unsafe_allow_html=True)
@@ -731,7 +791,10 @@ def page_customers():
         with cc2:
             if st.button("Edit",key=f"ec{ri}"): st.session_state.edit_cust_idx=ri; st.session_state.show_add_cust=False
         with cc3:
-            if st.button("Del",key=f"dc{ri}"): custs.pop(ri); st.rerun()
+            if st.button("Del",key=f"dc{ri}"):
+                custs.pop(ri)
+                db_save_all()   # ← SAVE after delete customer
+                st.rerun()
         st.markdown("<hr style='margin:3px 0;border-color:#F3F4F6'>",unsafe_allow_html=True)
     ei=st.session_state.get("edit_cust_idx")
     if ei is not None and ei<len(custs):
@@ -744,7 +807,10 @@ def page_customers():
             s1,s2=st.columns(2)
             with s1: esv=st.form_submit_button("Save",type="primary",use_container_width=True)
             with s2: ecl=st.form_submit_button("Close",use_container_width=True)
-            if esv and en: custs[ei]={"name":en,"email":ee,"phone":ep,"address":ea}; st.session_state.edit_cust_idx=None; st.success("Updated!"); st.rerun()
+            if esv and en:
+                custs[ei]={"name":en,"email":ee,"phone":ep,"address":ea}
+                db_save_all()   # ← SAVE customer edit
+                st.session_state.edit_cust_idx=None; st.success("Updated!"); st.rerun()
             if ecl: st.session_state.edit_cust_idx=None; st.rerun()
     if st.session_state.get("show_add_cust"):
         st.markdown("---")
@@ -756,7 +822,10 @@ def page_customers():
             s1,s2=st.columns(2)
             with s1: asv=st.form_submit_button("Save",type="primary",use_container_width=True)
             with s2: acl=st.form_submit_button("Close",use_container_width=True)
-            if asv and an: custs.append({"name":an,"email":ae,"phone":ap2,"address":aa}); st.session_state.show_add_cust=False; st.success(f"'{an}' added!"); st.rerun()
+            if asv and an:
+                custs.append({"name":an,"email":ae,"phone":ap2,"address":aa})
+                db_save_all()   # ← SAVE new customer
+                st.session_state.show_add_cust=False; st.success(f"'{an}' added!"); st.rerun()
             if acl: st.session_state.show_add_cust=False; st.rerun()
 
 # ══════════════════════════════════════════════════════════════════
@@ -779,7 +848,10 @@ def page_items():
         with ic3:
             if st.button("Edit",key=f"ei{ri}"): st.session_state.edit_item_idx=ri; st.session_state.show_add_item=False
         with ic4:
-            if st.button("Del",key=f"di{ri}"): items.pop(ri); st.rerun()
+            if st.button("Del",key=f"di{ri}"):
+                items.pop(ri)
+                db_save_all()   # ← SAVE after delete item
+                st.rerun()
         st.markdown("<hr style='margin:3px 0;border-color:#F3F4F6'>",unsafe_allow_html=True)
     ei2=st.session_state.get("edit_item_idx")
     if ei2 is not None and ei2<len(items):
@@ -792,7 +864,10 @@ def page_items():
             s1,s2=st.columns(2)
             with s1: isv=st.form_submit_button("Save",type="primary",use_container_width=True)
             with s2: icl=st.form_submit_button("Close",use_container_width=True)
-            if isv and n: items[ei2]={"name":n,"code":cd,"price":pr,"unit":u,"desc":""}; st.session_state.edit_item_idx=None; st.success("Updated!"); st.rerun()
+            if isv and n:
+                items[ei2]={"name":n,"code":cd,"price":pr,"unit":u,"desc":""}
+                db_save_all()   # ← SAVE item edit
+                st.session_state.edit_item_idx=None; st.success("Updated!"); st.rerun()
             if icl: st.session_state.edit_item_idx=None; st.rerun()
     if st.session_state.get("show_add_item"):
         st.markdown("---")
@@ -804,21 +879,23 @@ def page_items():
             s1,s2=st.columns(2)
             with s1: aIsv=st.form_submit_button("Save",type="primary",use_container_width=True)
             with s2: aIcl=st.form_submit_button("Close",use_container_width=True)
-            if aIsv and n: items.append({"name":n,"code":cd,"price":pr,"unit":u,"desc":""}); st.session_state.show_add_item=False; st.success(f"'{n}' added!"); st.rerun()
+            if aIsv and n:
+                items.append({"name":n,"code":cd,"price":pr,"unit":u,"desc":""})
+                db_save_all()   # ← SAVE new item
+                st.session_state.show_add_item=False; st.success(f"'{n}' added!"); st.rerun()
             if aIcl: st.session_state.show_add_item=False; st.rerun()
 
 # ══════════════════════════════════════════════════════════════════
-# SETTINGS — with Supabase save
+# SETTINGS
 # ══════════════════════════════════════════════════════════════════
 def page_settings():
     st.markdown('<p class="pt">Settings</p>',unsafe_allow_html=True)
     s=st.session_state.settings
 
-    # Cloud status
     if SUPABASE_KEY:
-        st.success("☁️ Cloud save enabled — settings persist after refresh!")
+        st.success("☁️ Cloud save enabled — all data persists after refresh!")
     else:
-        st.warning("⚠️ SUPABASE_KEY not set — settings lost on refresh. Add it in Streamlit Cloud Secrets.")
+        st.warning("⚠️ SUPABASE_KEY not set — data lost on refresh. Add it in Streamlit Cloud Secrets.")
 
     sec=st.radio("",["Company","Payment","Accounts","Tax & Currency"],horizontal=True,label_visibility="collapsed")
     st.markdown("---")
@@ -827,11 +904,11 @@ def page_settings():
         lf=st.file_uploader("Upload Logo",type=["png","jpg","jpeg"])
         if lf:
             s["logo_b64"]=base64.b64encode(lf.read()).decode()
-            db_save_settings(s)
+            db_save_all()
             st.success("Logo saved!"); st.rerun()
         if s.get("logo_b64"):
             st.markdown(f'<img src="data:image/png;base64,{s["logo_b64"]}" style="height:60px;border-radius:8px;margin-bottom:10px">',unsafe_allow_html=True)
-            if st.button("Remove Logo"): s["logo_b64"]=None; db_save_settings(s); st.rerun()
+            if st.button("Remove Logo"): s["logo_b64"]=None; db_save_all(); st.rerun()
         c1,c2=st.columns(2)
         with c1:
             sn   = st.text_input("Company Name",    value=s.get("company_name",""))
@@ -847,7 +924,7 @@ def page_settings():
             s.update({"company_name":sn,"company_tagline":stag,"owner_name":sown,
                       "company_phone":sp,"company_email":se,"gst_no":sg,
                       "company_address1":sa1,"company_address2":sa2})
-            if db_save_settings(s):
+            if db_save_all():
                 st.success("Saved to cloud! Will persist after refresh.")
             else:
                 st.warning("Saved locally. Add SUPABASE_KEY to persist.")
@@ -857,7 +934,7 @@ def page_settings():
         ins=st.text_area("Payment Instructions",value=s.get("payment_instructions",""),height=120)
         if st.button("Save",type="primary"):
             s["payment_instructions"]=ins
-            if db_save_settings(s):
+            if db_save_all():
                 st.success("Saved to cloud!")
             else:
                 st.warning("Saved locally.")
@@ -868,10 +945,10 @@ def page_settings():
             rc1,rc2=st.columns([5,1])
             with rc1: st.markdown(f'<div style="padding:10px 14px;background:#f8f9fa;border:1px solid #E5E7EB;border-radius:7px;font-weight:600">{a}</div>',unsafe_allow_html=True)
             with rc2:
-                if st.button("Del",key=f"da{i}"): accs.pop(i); s["accounts"]=accs; db_save_settings(s); st.rerun()
+                if st.button("Del",key=f"da{i}"): accs.pop(i); s["accounts"]=accs; db_save_all(); st.rerun()
         na=st.text_input("New Account Name")
         if st.button("+ Add",type="primary"):
-            if na: accs.append(na); s["accounts"]=accs; db_save_settings(s); st.rerun()
+            if na: accs.append(na); s["accounts"]=accs; db_save_all(); st.rerun()
 
     elif sec=="Tax & Currency":
         c1,c2=st.columns(2)
@@ -879,7 +956,7 @@ def page_settings():
         with c2: df2=st.selectbox("Date Format",["DD/MM/YYYY","MM/DD/YYYY","YYYY/MM/DD"],index=["DD/MM/YYYY","MM/DD/YYYY","YYYY/MM/DD"].index(s.get("date_format","DD/MM/YYYY")))
         if st.button("Save",type="primary"):
             s.update({"tax_rate":tr,"date_format":df2})
-            if db_save_settings(s):
+            if db_save_all():
                 st.success("Saved to cloud!")
             else:
                 st.warning("Saved locally.")
