@@ -3,7 +3,7 @@ from supabase import create_client, Client
 import streamlit as st
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://zibexeqgtajeaujjkwqe.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_publishable_shAvQqA5x7gyws8_rBgnOg_Hf519JUT")
 
 @st.cache_resource
 def get_supabase() -> Client:
