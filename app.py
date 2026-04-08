@@ -189,7 +189,7 @@ def init():
         "gst_no":"","currency":"INR","date_format":"DD/MM/YYYY","tax_rate":0,
         "logo_b64":None,"next_invoice_no":1001,
         "accounts":["Cash","UPI / GPay","Bank Transfer"],
-        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad, BE., MBA.\nGpay No: 9940147658",
+        "payment_instructions":"Bank: SBI, A/c no: 20001142967\nIFSC: SBIN0018229\nName: T.ArunPrasad,\nGpay No: 9940147658",
       },
       "transactions":[],
     }
